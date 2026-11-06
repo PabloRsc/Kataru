@@ -52,6 +52,7 @@ export function normalizeAnime(a) {
     image_url: a.images?.webp?.large_image_url || a.images?.jpg?.large_image_url || '',
     synopsis: a.synopsis || '',
     episodes_total: a.episodes ?? null,
+    airing_status: a.status || null,
     year: a.year || a.aired?.prop?.from?.year || null,
     season: a.season || null,
     genres: (a.genres || []).map(g => g.name),

@@ -27,9 +27,9 @@ export default function AuthGate({ children }) {
     e.preventDefault(); setBusy(true); setError(''); setMessage('');
     try {
       if (mode === 'signup') {
-        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: window.location.origin } });
         if (error) throw error;
-        if (data.session) setMessage('Conta criada. Bem-vindo ao AnimeLog!');
+        if (data.session) setMessage('Conta criada. Bem-vindo ao Kataru!');
         else setMessage('Cadastro iniciado! Confira seu e-mail para confirmar a conta antes de entrar.');
       } else if (mode === 'reset') {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
@@ -45,10 +45,10 @@ export default function AuthGate({ children }) {
 
   if (loading) return <div className="auth-screen"><LoaderCircle className="spin"/> Carregando sua conta...</div>;
   if (session) return <>{React.cloneElement(children, { key: session.user.id })}</>;
-  if (!isSupabaseConfigured) return <div className="auth-screen"><section className="auth-card"><div className="auth-brand"><Clapperboard/> animelog</div><h1>Configure sua nuvem</h1><p>Para ativar contas individuais e sincronização, configure <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_ANON_KEY</code> no ambiente de implantação. Consulte o README.</p></section></div>;
+  if (!isSupabaseConfigured) return <div className="auth-screen"><section className="auth-card"><div className="auth-brand"><Clapperboard/> Kataru</div><h1>Configure sua nuvem</h1><p>Para ativar contas individuais e sincronização, configure <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_ANON_KEY</code> no ambiente de implantação. Consulte o README.</p></section></div>;
 
   return <div className="auth-screen"><form className="auth-card" onSubmit={submit}>
-    <div className="auth-brand"><Clapperboard/> animelog</div>
+    <div className="auth-brand"><Clapperboard/> Kataru</div>
     <p className="eyebrow">SUA BIBLIOTECA PESSOAL</p>
     <h1>{mode === 'signup' ? 'Crie sua conta' : mode === 'reset' ? 'Redefinir senha' : 'Bem-vindo de volta'}</h1>
     <p className="auth-description">Sua coleção de animes, privada e sincronizada.</p>

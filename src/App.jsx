@@ -23,6 +23,7 @@ const STATUSES = [
 const EMPTY_FORM = {
   status: 'planned',
   episode_current: 0,
+  episodes_total_mode: 'unknown',
   rating_personal: '',
   notes: '',
   display_title: '',
@@ -324,7 +325,12 @@ export default function App() {
 
   async function changeStatus(anime, status) {
     const updated = { ...anime, status };
-    if (status === 'completed' && !updated.completed_at) updated.completed_at = new Date().toISOString().slice(0, 10);
+    if (status === 'completed') {
+      const total = totalEpisodes(anime);
+      if (total) updated.episode_current = total;
+      if (!updated.completed_at) updated.completed_at = new Date().toISOString().slice(0, 10);
+    }
+    if (status === 'watching' && !updated.started_at) updated.started_at = new Date().toISOString().slice(0, 10);
     return persistAnime(updated, 'Status atualizado.');
   }
 
@@ -1082,6 +1088,20 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose }) {
   const update = (key, value) => setForm(current => ({ ...current, [key]: value }));
   const today = new Date().toISOString().slice(0, 10);
   const isNew = !anime.created_at;
+  const isDirty = !isNew && (
+    form.status !== (anime.status || 'planned') ||
+    String(form.episode_current ?? 0) !== String(anime.episode_current ?? 0) ||
+    String(form.rating_personal ?? '') !== String(anime.rating_personal ?? '') ||
+    String(form.notes || '') !== String(anime.notes || '') ||
+    String(form.display_title || '') !== String(anime.display_title || '') ||
+    String(form.episodes_total_manual ?? '') !== String(anime.episodes_total_manual ?? '') ||
+    String(form.rewatch_count ?? 0) !== String(anime.rewatch_count ?? 0) ||
+    String(form.started_at || '') !== String(anime.started_at || '') ||
+    String(form.completed_at || '') !== String(anime.completed_at || '') ||
+    String(form.format || '') !== String(anime.format || '') ||
+    String(form.title || '') !== String(anime.title || '') ||
+    Boolean(form.is_manual) !== Boolean(anime.is_manual)
+  );
   const nextEpisode = Number(form.episode_current || 0);
   const catalogTotal = Number(anime.episodes_total || 0);
   const manualTotal = Number(form.episodes_total_manual || 0);
@@ -1103,6 +1123,7 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose }) {
     <div className="overlay editor-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
       <form className="modal editor-modal" onSubmit={onSubmit}>
         <div className="modal-header"><div><p className="eyebrow">{isNew ? 'PASSO 2 DE 2 · DEFINA O STATUS' : 'DETALHES DA SUA BIBLIOTECA'}</p><h2>{isNew ? 'Adicionar à biblioteca' : 'Editar anime'}</h2></div><button type="button" className="icon-button" onClick={onClose}><X size={18} /></button></div>
+        {isDirty && <div className="editor-unsaved-banner"><span>Você tem alterações não salvas.</span><button type="button" onClick={onClose}>Descartar alterações</button></div>}
         <div className="editor-anime-preview">
           {anime.image_url ? <img src={anime.image_url} alt="" /> : <div className="editor-cover-fallback"><Clapperboard size={24} /></div>}
           <div><strong>{anime.title || 'Novo anime'}</strong><span>{anime.year || 'Ano não informado'} · {catalogTotal || manualTotal || 'Total não informado'} episódios</span><small>{(anime.genres || []).slice(0, 3).join(' · ')}</small></div>
@@ -1156,7 +1177,8 @@ function ListEditorModal({ list, form, setForm, saving, onSubmit, onClose }) {
         <div className="modal-header"><div><p className="eyebrow">ORGANIZE DO SEU JEITO</p><h2>{list ? 'Editar lista' : 'Nova lista'}</h2></div><button type="button" className="icon-button" onClick={onClose}><X size={18} /></button></div>
         <label className="field"><span>Nome</span><input autoFocus required maxLength="60" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Favoritos de todos os tempos" /></label>
         <label className="field list-description-field"><span>Descrição</span><textarea rows="3" maxLength="220" value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} placeholder="Sobre o que é esta lista?" /></label>
-        <label className="visibility-toggle"><input type="checkbox" checked={form.is_public} onChange={event => setForm({ ...form, is_public: event.target.checked })} /><span><strong>Lista pública</strong><small>Permite compartilhar esta lista futuramente.</small></span><i>{form.is_public ? 'Pública' : 'Privada'}</i></label>
+        <label className="visibility-toggle"><input type="checkbox" checked={form.is_public} onChange={event => setForm({ ...form, is_public: event.target.checked })} /><span><strong>Lista pública</strong><small>A preferência fica salva, mas o compartilhamento ainda não está ativo.</small></span><i>{form.is_public ? 'Pública' : 'Privada'}</i></label>
+        <label className="visibility-toggle ranked-toggle"><input type="checkbox" checked={Boolean(form.is_ranked)} onChange={event => setForm({ ...form, is_ranked: event.target.checked })} /><span><strong>Lista ranqueada</strong><small>Mostra posições e permite reordenar os animes por preferência.</small></span><i>{form.is_ranked ? 'Ranking' : 'Livre'}</i></label>
         <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancelar</button><button className="primary-button" disabled={saving || !form.name.trim()}>{saving ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{list ? 'Salvar alterações' : 'Criar lista'}</button></div>
       </form>
     </div>

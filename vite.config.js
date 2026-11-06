@@ -12,7 +12,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api/genres': jikanProxy(path => path.replace(/^\/api\/genres/, '/v4/genres')),
+      '/api/catalog': jikanProxy(path => path.replace(/^\/api\/catalog/, '/v4')),
       '/api/seasons': jikanProxy(path => path.replace(/^\/api\/seasons/, '/v4/seasons')),
       '/api/top': jikanProxy(path => path.replace(/^\/api\/top/, '/v4/top')),
       '/api/anime': jikanProxy(path => {

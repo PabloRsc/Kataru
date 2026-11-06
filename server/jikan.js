@@ -11,7 +11,7 @@ export async function requestJikan(path) {
     const timeout = setTimeout(() => controller.abort(), 4000);
 
     try {
-      const response = await fetch(\`\${JIKAN_BASE}\${path}\`, {
+      const response = await fetch(JIKAN_BASE + path, {
         signal: controller.signal,
         headers: { Accept: 'application/json' }
       });
@@ -25,13 +25,13 @@ export async function requestJikan(path) {
         const error = new Error(
           response.status === 429
             ? 'O catálogo está recebendo muitas consultas. Aguarde alguns segundos e tente novamente.'
-            : \`O catálogo de animes respondeu com erro (\${response.status}).\`
+            : 'O catálogo de animes respondeu com erro (' + response.status + ').'
         );
         error.status = response.status === 429 ? 429 : 502;
         throw error;
       }
 
-      lastError = new Error(\`Jikan HTTP \${response.status}\`);
+      lastError = new Error('Jikan HTTP ' + response.status);
     } catch (error) {
       if (error.status) throw error;
       lastError = error.name === 'AbortError'

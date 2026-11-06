@@ -138,8 +138,8 @@ export default function App() {
     }
     setResults([]);
     setSearchError('');
+    setSearching(true);
     const timer = window.setTimeout(() => {
-      setSearching(true);
       searchAnime(q)
         .then(data => {
           if (requestId === searchRequestRef.current) setResults(data || []);

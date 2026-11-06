@@ -4,10 +4,8 @@ async function request(path) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 22000);
   try {
-    const response = await fetch(path.startsWith('/api/') ? path : BASE + path, {
-      signal: controller.signal,
-      headers: { Accept: 'application/json' }
-    });
+    const url = path.startsWith('/api/') ? path : BASE + path;
+    const response = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(payload.message || (response.status === 504
@@ -36,14 +34,14 @@ export async function fetchAnime(malId) {
 
 export async function discoverAnime(kind = 'current') {
   let path;
-  if (kind === 'current') path = '/seasons/now?limit=24&sfw=true';
-  else if (kind === 'upcoming') path = '/seasons/upcoming?limit=24&sfw=true';
-  else if (kind === 'popular') path = '/top?type=tv&filter=bypopularity&limit=24';
+  if (kind === 'current') path = '/api/seasons/now?limit=24&sfw=true';
+  else if (kind === 'upcoming') path = '/api/seasons/upcoming?limit=24&sfw=true';
+  else if (kind === 'popular') path = '/api/top/anime?type=tv&filter=bypopularity&limit=24';
   else if (String(kind).startsWith('genre-')) {
     const id = Number(String(kind).slice(6));
     if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Gênero inválido.');
-    path = '/?genres=' + id + '&order_by=popularity&sort=asc&limit=24&sfw=true';
-  } else path = '/seasons/now?limit=24&sfw=true';
+    path = '/api/anime?genres=' + id + '&order_by=popularity&sort=asc&limit=24&sfw=true';
+  } else path = '/api/seasons/now?limit=24&sfw=true';
 
   const data = await request(path);
   return (data.data || []).map(normalizeAnime);

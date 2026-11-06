@@ -11,8 +11,8 @@ export default defineConfig({
         secure: true,
         rewrite: path => {
           if (path === '/api/anime/search') return '/v4/anime';
-          const match = path.match(/^\/api\/anime\/([0-9]+)$/);
-          return match ? \`/v4/anime/\${match[1]}/full\` : path;
+          const match = path.match(/^\\/api\\/anime\\/([0-9]+)$/);
+          return match ? '/v4/anime/' + match[1] + '/full' : path;
         }
       }
     }

@@ -28,6 +28,8 @@ create table if not exists public.anime_lists (
   updated_at timestamptz not null default now()
 );
 
+create unique index if not exists anime_lists_owner_id_key
+  on public.anime_lists(owner_id, id);
 create index if not exists anime_lists_owner_updated_idx
   on public.anime_lists(owner_id, updated_at desc);
 

@@ -122,6 +122,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const requestId = ++searchRequestRef.current;
     if (!searchOpen) return undefined;
     const q = searchQuery.trim();
     if (q.length < 2) {
@@ -130,7 +131,6 @@ export default function App() {
       setSearching(false);
       return undefined;
     }
-    const requestId = ++searchRequestRef.current;
     setResults([]);
     setSearchError('');
     const timer = window.setTimeout(() => {
@@ -417,10 +417,16 @@ export default function App() {
 
   async function changeStatus(anime, status) {
     const updated = { ...anime, status };
+    if (status === 'planned') {
+      updated.episode_current = 0;
+      updated.completed_at = null;
+    }
     if (status === 'completed') {
       const total = totalEpisodes(anime);
       updated.episode_current = total || Number(anime.episodes_available || 0) || Number(anime.episode_current || 0);
       if (!updated.completed_at) updated.completed_at = new Date().toISOString().slice(0, 10);
+    } else {
+      updated.completed_at = null;
     }
     if (status === 'watching' && !updated.started_at) updated.started_at = new Date().toISOString().slice(0, 10);
     return persistAnime(updated, 'Status atualizado.');

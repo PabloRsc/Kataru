@@ -36,7 +36,8 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 
 ## Pendências prioritárias
 
-1. Confirmar deploy da nova API de catálogo na Vercel e testar `/api/anime/search?q=one%20piece`.\n2. Executar npm install e npm run build.
+1. Confirmar deploy da nova API de catálogo na Vercel e testar `/api/anime/search?q=one%20piece`.
+2. Executar npm install e npm run build.
 3. Testar fluxos de autenticação e políticas RLS com duas contas reais.
 4. Completar/verificar o fluxo de redefinição de senha após retorno do e-mail.
 5. Implementar importação opcional de coleção local para conta autenticada.

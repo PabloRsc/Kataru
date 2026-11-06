@@ -15,7 +15,7 @@ const MEDIA_FIELDS = `
 
 async function queryAniList(query, variables) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6500);
+  const timeout = setTimeout(() => controller.abort(), 3500);
 
   try {
     const response = await fetch(ANILIST_URL, {

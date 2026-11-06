@@ -100,6 +100,7 @@ export default function App() {
   const [discoverGenres, setDiscoverGenres] = useState([]);
   const [discoverGenre, setDiscoverGenre] = useState(null);
   const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverReload, setDiscoverReload] = useState(0);
   const [discoverError, setDiscoverError] = useState('');
   const [listEditorOpen, setListEditorOpen] = useState(false);
   const [listEditing, setListEditing] = useState(null);
@@ -137,7 +138,7 @@ export default function App() {
         .finally(() => { if (active) setDiscoverLoading(false); });
     }
     return () => { active = false; };
-  }, [page, discoverTab, discoverGenre]);
+  }, [page, discoverTab, discoverGenre, discoverReload]);
 
   function notify(message) {
     setToast(message);
@@ -549,6 +550,7 @@ export default function App() {
             loading={discoverLoading}
             error={discoverError}
             selectedGenre={discoverGenre}
+            onRetry={() => setDiscoverReload(value => value + 1)}
             onSelectGenre={genre => { setDiscoverGenre(genre); setDiscoverTab('genre'); }}
             onOpenAnime={anime => {
               const existing = items.find(item => String(item.mal_id) === String(anime.mal_id));
@@ -802,7 +804,7 @@ function AnimeRow({ anime, onClick }) {
   );
 }
 
-function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGenre, onSelectGenre, onOpenAnime, onAdd, isInCollection }) {
+function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGenre, onRetry, onSelectGenre, onOpenAnime, onAdd, isInCollection }) {
   const [genreQuery, setGenreQuery] = useState('');
   const shownGenres = genres.filter(genre => String(genre.name || '').toLowerCase().includes(genreQuery.toLowerCase()));
   const title = tab === 'popular' ? 'Em alta nesta temporada' : tab === 'upcoming' ? 'Próximos lançamentos' : tab === 'genre' ? selectedGenre?.name || 'Gênero' : 'Temporada atual';
@@ -817,14 +819,14 @@ function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGe
         <>
           <div className="discover-section-heading"><div><h2>Explore por gênero</h2><p>Escolha um estilo e descubra novos títulos.</p></div></div>
           <label className="search-field genre-search"><Search size={16} /><input value={genreQuery} onChange={event => setGenreQuery(event.target.value)} placeholder="Buscar gênero" /></label>
-          {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando gêneros...</div> : error ? <CatalogError message={error} onRetry={() => setTab('genres')} /> : (
+          {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando gêneros...</div> : error ? <CatalogError message={error} onRetry={onRetry} /> : (
             <div className="genre-grid">{shownGenres.map(genre => <button key={genre.mal_id} className="genre-card" onClick={() => onSelectGenre(genre)}><span>{genre.name}</span><ArrowUpRightIcon /></button>)}</div>
           )}
         </>
       ) : (
         <>
           {tab === 'genre' && <div className="genre-context"><span>GÊNERO SELECIONADO</span><strong>{selectedGenre?.name}</strong><button onClick={() => setTab('genres')}>Trocar gênero <ChevronRight size={13} /></button></div>}
-          {loading ? <div className="loading-block"><LoaderCircle className="spin" />Explorando o catálogo...</div> : error ? <CatalogError message={error} onRetry={() => setTab(tab)} /> : (
+          {loading ? <div className="loading-block"><LoaderCircle className="spin" />Explorando o catálogo...</div> : error ? <CatalogError message={error} onRetry={onRetry} /> : (
             <>
               {feature && (
                 <section className="discover-feature" style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,17,23,.98) 0%, rgba(15,17,23,.82) 46%, rgba(15,17,23,.22) 100%), url("' + (feature.image_url || '') + '")' }}>

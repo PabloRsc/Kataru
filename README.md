@@ -74,6 +74,7 @@ npm run preview
 - **src/AuthGate.jsx:** cadastro, login, redefinição de senha e sessão.
 - **src/api.js:** cliente do catálogo e descoberta.
 - **api/anime/:** funções serverless para pesquisa e detalhes.
+- **api/catalog/[...path].js:** rotas serverless do catálogo usadas em Descobrir.
 - **server/jikan.js:** cliente Jikan server-side com timeout e retry.
 - **server/anilist.js:** fonte alternativa via AniList GraphQL e normalização.
 - **vite.config.js:** proxy local para as rotas de catálogo.

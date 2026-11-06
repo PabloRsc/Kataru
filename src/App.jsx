@@ -62,6 +62,11 @@ const shortDate = value => {
 
 const displayTitle = anime => anime?.display_title?.trim() || anime?.title || 'Sem título';
 const totalEpisodes = anime => Number(anime?.episodes_total_manual || anime?.episodes_total || 0) || null;
+const isCurrentlyAiring = anime => /currently airing|em exibição/i.test(String(anime?.airing_status || ''));
+const latestAiredEpisode = anime => Number(anime?.episodes_available || 0) || null;
+const episodeProgressLimit = anime => isCurrentlyAiring(anime)
+  ? latestAiredEpisode(anime)
+  : totalEpisodes(anime) || latestAiredEpisode(anime);
 const statusLabel = id => STATUSES.find(status => status.id === id)?.label || 'Quero assistir';
 const statusTone = id => STATUSES.find(status => status.id === id)?.tone || 'yellow';
 const sortByRecent = (a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
@@ -174,7 +179,7 @@ export default function App() {
       anime.status === 'watching' &&
       !anime.is_manual &&
       !anime.episodes_available &&
-      !totalEpisodes(anime)
+      (isCurrentlyAiring(anime) || !totalEpisodes(anime))
     ).forEach(anime => {
       const id = String(anime.mal_id);
       if (availabilityRequestsRef.current.has(id)) return;
@@ -309,8 +314,8 @@ export default function App() {
     }
     setSaving(true);
     try {
-      const catalogTotal = totalEpisodes(editor);
-      const available = Number(editor.episodes_available || 0) || null;
+      const catalogTotal = isCurrentlyAiring(editor) ? null : totalEpisodes(editor);
+      const available = episodeProgressLimit(editor);
       const completedCount = catalogTotal || available || Number(editor.episode_current || 0);
       const anime = {
         ...editor,
@@ -366,9 +371,8 @@ export default function App() {
 
   async function changeEpisode(anime, delta) {
     const next = Math.max(0, Number(anime.episode_current || 0) + delta);
-    const total = totalEpisodes(anime);
-    const available = Number(anime.episodes_available || 0) || null;
-    const limit = total || available;
+    const total = isCurrentlyAiring(anime) ? null : totalEpisodes(anime);
+    const limit = episodeProgressLimit(anime);
     if (limit && next > limit) {
       notify('Você já chegou ao último episódio disponível informado pelo catálogo.');
       return;
@@ -422,8 +426,7 @@ export default function App() {
       updated.completed_at = null;
     }
     if (status === 'completed') {
-      const total = totalEpisodes(anime);
-      updated.episode_current = total || Number(anime.episodes_available || 0) || Number(anime.episode_current || 0);
+      updated.episode_current = episodeProgressLimit(anime) || Number(anime.episode_current || 0);
       if (!updated.completed_at) updated.completed_at = new Date().toISOString().slice(0, 10);
     } else {
       updated.completed_at = null;
@@ -805,8 +808,8 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
 function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd }) {
   const featured = watching[0] || null;
   const currentEpisode = Number(featured?.episode_current || 0);
-  const expectedTotal = featured ? totalEpisodes(featured) : null;
-  const available = featured ? Number(featured.episodes_available || 0) || null : null;
+  const expectedTotal = featured && !isCurrentlyAiring(featured) ? totalEpisodes(featured) : null;
+  const available = featured ? episodeProgressLimit(featured) : null;
   const nextEpisode = currentEpisode + 1;
   const canMarkNext = Boolean(featured && (available ? currentEpisode < available : expectedTotal ? currentEpisode < expectedTotal : false));
   const progressTotal = expectedTotal || available;
@@ -832,10 +835,10 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
           <div className="hero-copy">
             <span className="hero-kicker"><Zap size={13} fill="currentColor" /> CONTINUE DE ONDE PAROU</span>
             <h2>{displayTitle(featured)}</h2>
-            <p>{expectedTotal ? expectedTotal + ' episódios' : available ? available + ' episódios lançados até agora' : 'Série em andamento'}</p>
+            <p>{expectedTotal ? expectedTotal + ' episódios' : available ? available + (isCurrentlyAiring(featured) ? ' episódios lançados até agora' : ' episódios') : 'Série em andamento'}</p>
             <div className="hero-progress">
               <div><span style={{ width: progress + '%' }} /></div>
-              <small>{expectedTotal ? 'EP. ' + currentEpisode + ' / ' + expectedTotal : available ? 'EP. ' + currentEpisode + ' · ' + available + ' lançados' : 'EP. ' + currentEpisode}</small>
+              <small>{expectedTotal ? 'EP. ' + currentEpisode + ' / ' + expectedTotal : available ? 'EP. ' + currentEpisode + ' / ' + available + (isCurrentlyAiring(featured) ? ' lançados' : '') : 'EP. ' + currentEpisode}</small>
             </div>
             <div className="hero-actions">
               {canMarkNext
@@ -889,7 +892,7 @@ function AnimeShelf({ title, subtitle, items, onViewAll, onOpenAnime }) {
 }
 
 function PosterCard({ anime, onClick, compact = false }) {
-  const total = totalEpisodes(anime);
+  const total = episodeProgressLimit(anime);
   const progress = total ? Math.min(100, (Number(anime.episode_current || 0) / total) * 100) : 0;
   return (
     <button className={compact ? 'poster-card compact' : 'poster-card'} onClick={onClick} title={displayTitle(anime)}>
@@ -955,7 +958,7 @@ function LibraryPage({
 }
 
 function AnimeRow({ anime, onClick }) {
-  const total = totalEpisodes(anime);
+  const total = episodeProgressLimit(anime);
   const pct = total ? Math.round((Number(anime.episode_current || 0) / total) * 100) : 0;
   return (
     <button className="anime-row" onClick={onClick}>
@@ -1106,8 +1109,8 @@ function CustomListDetail({ list, items, onBack, onEdit, onDelete, onOpenAnime, 
 }
 
 function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChange, onStatusChange, onRatingChange, onAddToList }) {
-  const total = totalEpisodes(anime);
-  const available = Number(anime.episodes_available || 0) || null;
+  const total = isCurrentlyAiring(anime) ? null : totalEpisodes(anime);
+  const available = episodeProgressLimit(anime);
   const progressTotal = total || available;
   const current = Number(anime.episode_current || 0);
   const progress = progressTotal ? Math.min(100, Math.round((current / progressTotal) * 100)) : 0;
@@ -1240,8 +1243,8 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
     String(form.title || '') !== String(anime.title || '') ||
     Boolean(form.is_manual) !== Boolean(anime.is_manual)
   ));
-  const total = totalEpisodes(anime);
-  const available = Number(anime.episodes_available || 0) || null;
+  const total = isCurrentlyAiring(anime) ? null : totalEpisodes(anime);
+  const available = episodeProgressLimit(anime);
   const maxEpisode = total || available || undefined;
   const episode = Number(form.episode_current || 0);
   const needsEpisode = ['watching', 'paused', 'dropped'].includes(form.status);

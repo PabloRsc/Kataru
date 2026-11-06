@@ -2,14 +2,27 @@ import { createClient } from '@supabase/supabase-js';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = url && key ? createClient(url, key) : null;
+export const supabase = url && key ? createClient(url, key, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+}) : null;
 const LOCAL_KEY = 'animelog.collection.v1';
 
 export const storageMode = supabase ? 'supabase' : 'local';
+export const isSupabaseConfigured = Boolean(supabase);
+
+async function requireUser() {
+  if (!supabase) throw new Error('Configure o Supabase para usar sua conta e sincronizar sua coleção.');
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!user) throw new Error('Sua sessão expirou. Entre novamente.');
+  return user;
+}
 
 export async function getAnimeList() {
   if (supabase) {
-    const { data, error } = await supabase.from('anime_collection').select('*').order('created_at', { ascending: false });
+    const user = await requireUser();
+    const { data, error } = await supabase.from('anime_collection').select('*')
+      .eq('owner_id', user.id).order('created_at', { ascending: false });
     if (error) throw error;
     return data.map(fromRow);
   }
@@ -19,8 +32,9 @@ export async function getAnimeList() {
 
 export async function saveAnime(anime) {
   if (supabase) {
-    const row = toRow(anime);
-    const { data, error } = await supabase.from('anime_collection').upsert(row).select().single();
+    const user = await requireUser();
+    const row = toRow(anime, user.id);
+    const { data, error } = await supabase.from('anime_collection').upsert(row, { onConflict: 'owner_id,mal_id' }).select().single();
     if (error) throw error;
     return fromRow(data);
   }
@@ -33,7 +47,8 @@ export async function saveAnime(anime) {
 
 export async function deleteAnime(id) {
   if (supabase) {
-    const { error } = await supabase.from('anime_collection').delete().eq('id', id);
+    const user = await requireUser();
+    const { error } = await supabase.from('anime_collection').delete().eq('id', id).eq('owner_id', user.id);
     if (error) throw error;
     return;
   }
@@ -41,13 +56,13 @@ export async function deleteAnime(id) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(all.filter(item => item.id !== id)));
 }
 
-function toRow(a) {
-  return { id: a.id, mal_id: a.mal_id, title: a.title, title_english: a.title_english, image_url: a.image_url,
-    synopsis: a.synopsis, episodes_total: a.episodes_total, year: a.year, season: a.season, genres: a.genres,
-    score_external: a.score_external, status: a.status, episode_current: a.episode_current, rating_personal: a.rating_personal,
-    notes: a.notes, updated_at: new Date().toISOString(), api_synced_at: a.api_synced_at || null };
+function toRow(a, ownerId) {
+  return { id: `${ownerId}:${a.mal_id}`, owner_id: ownerId, mal_id: a.mal_id, title: a.title,
+    title_english: a.title_english, image_url: a.image_url, synopsis: a.synopsis, episodes_total: a.episodes_total,
+    year: a.year, season: a.season, genres: a.genres, score_external: a.score_external, status: a.status,
+    episode_current: a.episode_current, rating_personal: a.rating_personal, notes: a.notes,
+    updated_at: new Date().toISOString(), api_synced_at: a.api_synced_at || null };
 }
-function fromRow(r) { return { ...r, id: r.id, mal_id: r.mal_id, title: r.title, title_english: r.title_english,
-  image_url: r.image_url, synopsis: r.synopsis, episodes_total: r.episodes_total, year: r.year, season: r.season,
-  genres: r.genres || [], score_external: r.score_external, status: r.status, episode_current: r.episode_current,
-  rating_personal: r.rating_personal, notes: r.notes, api_synced_at: r.api_synced_at }; }
+function fromRow(r) {
+  return { ...r, genres: r.genres || [], api_synced_at: r.api_synced_at };
+}

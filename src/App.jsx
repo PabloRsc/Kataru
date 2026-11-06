@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft,
   ChevronRight, Clapperboard, Clock3, Compass, Filter, Grid2X2, Heart, Home,
@@ -96,6 +96,8 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [toastAction, setToastAction] = useState(null);
+  const [toastActionBusy, setToastActionBusy] = useState(false);
+  const toastTimerRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [discoverTab, setDiscoverTab] = useState('current');
   const [discoverResults, setDiscoverResults] = useState([]);
@@ -143,13 +145,20 @@ export default function App() {
   }, [page, discoverTab, discoverGenre, discoverReload]);
 
   function notify(message, action = null) {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     setToast(message);
     setToastAction(action);
-    window.setTimeout(() => {
+    setToastActionBusy(false);
+    toastTimerRef.current = window.setTimeout(() => {
       setToast('');
       setToastAction(null);
+      toastTimerRef.current = null;
     }, 3600);
   }
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+  }, []);
 
   const counts = useMemo(() => {
     const values = { all: items.length };
@@ -730,7 +739,13 @@ export default function App() {
         />
       )}
 
-      {toast && <div className="toast"><Check size={16} /><span>{toast}</span>{toastAction && <button type="button" onClick={toastAction}>Desfazer</button>}</div>}
+      {toast && <div className="toast"><Check size={16} /><span>{toast}</span>{toastAction && <button type="button" disabled={toastActionBusy} onClick={async () => {
+        if (!toastAction || toastActionBusy) return;
+        setToastActionBusy(true);
+        await toastAction();
+        setToastAction(null);
+        setToastActionBusy(false);
+      }}>{toastActionBusy ? 'Desfazendo…' : 'Desfazer'}</button>}</div>}
     </div>
   );
 }

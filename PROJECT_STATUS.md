@@ -47,22 +47,17 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 
 ## Arquivos centrais
 
-- src/App.jsx — interface principal.
-- src/AuthGate.jsx — autenticação e controle de sessão.
-- src/storage.js — persistência local/Supabase.
-- src/api.js — cliente da API própria de catálogo.
-- api/anime/ — endpoints serverless de pesquisa e detalhes.
-- server/jikan.js — Jikan com timeout e retry.
-- server/anilist.js — fallback AniList e normalização.
-- api/anime/ — endpoints serverless de pesquisa e detalhes.
-- server/jikan.js — integração server-side com Jikan, timeout e retry.
-- vite.config.js — proxy local das rotas de catálogo.
-- api/anime/ — endpoints serverless de pesquisa e detalhes.
-- server/jikan.js — integração server-side com Jikan, timeout e retry.
-- vite.config.js — proxy local das rotas de catálogo.
-- src/styles.css — interface.
-- supabase/schema.sql — banco e RLS.
+- `src/App.jsx` — interface principal.
+- `src/AuthGate.jsx` — autenticação e controle de sessão.
+- `src/storage.js` — persistência local/Supabase.
+- `src/api.js` — cliente da API própria de catálogo.
+- `api/anime/` — endpoints serverless de pesquisa e detalhes.
+- `server/jikan.js` — Jikan com timeout e retry limitado.
+- `server/anilist.js` — fallback AniList e normalização.
+- `vite.config.js` — proxy local das rotas de catálogo.
+- `src/styles.css` — interface.
+- `supabase/schema.sql` — banco e RLS.
 
 ## Verificação
 
-As alterações foram publicadas diretamente na branch main do GitHub. A nova arquitetura de catálogo ainda precisa ser validada pelo próximo deploy da Vercel; build e testes automatizados não foram executados neste ambiente.
+As alterações foram publicadas diretamente na branch main do GitHub. A arquitetura com fallback AniList foi publicada na branch main e aguarda validação no próximo deploy da Vercel. Build e testes automatizados ainda não foram executados neste ambiente.

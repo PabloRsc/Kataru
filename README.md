@@ -1,4 +1,4 @@
-# AnimeLog
+# Kataru
 
 Gerenciador pessoal de animes com coleções privadas por usuário, interface em português, catálogo consultado pela [Jikan API](https://docs.api.jikan.moe/) e persistência local ou Supabase.
 
@@ -24,7 +24,7 @@ Sem variáveis Supabase, o app permanece em modo local para desenvolvimento. Os 
 3. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
 4. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para os ambientes local e publicado.
 5. Copie `.env.example` para `.env` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
-6. Reinicie o Vite, crie uma conta na tela do AnimeLog e entre.
+6. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
 
 A tela de conta inclui cadastro, login, redefinição de senha e saída. Com Supabase configurado, a coleção exige sessão autenticada.
 
@@ -37,7 +37,7 @@ A tela de conta inclui cadastro, login, redefinição de senha e saída. Com Sup
 
 ## Catálogo
 
-A pesquisa e atualização manual consultam a Jikan API, uma API não oficial para dados do MyAnimeList. Há limites de requisição e o serviço pode ficar indisponível.
+A pesquisa e atualização manual passam por funções serverless da Vercel (`/api/anime`). O servidor consulta a Jikan API, uma API não oficial para dados do MyAnimeList, com timeout, uma nova tentativa em falhas temporárias e cache HTTP (5 minutos para pesquisas e 1 hora para detalhes). No desenvolvimento local, o Vite encaminha `/api/anime` para a Jikan. A Jikan continua sendo uma dependência externa e pode ficar indisponível; nesse caso o app mostra uma mensagem amigável.
 
 ## Próximas melhorias
 
@@ -57,7 +57,7 @@ npm run preview
 
 - `src/App.jsx`: interface, coleção, pesquisa e edição.
 - `src/AuthGate.jsx`: cadastro, login, redefinição de senha e sessão.
-- `src/api.js`: integração com Jikan.
+- `src/api.js`: cliente do catálogo via API própria.\n- `api/anime/`: funções serverless para pesquisa e detalhes.\n- `server/jikan.js`: cliente server-side com timeout e retry.\n- `vite.config.js`: proxy local para as rotas de catálogo.
 - `src/storage.js`: persistência local ou Supabase por usuário.
 - `src/styles.css`: estilos.
 - `supabase/schema.sql`: esquema e políticas RLS.

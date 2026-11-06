@@ -379,7 +379,7 @@ export default function App() {
       } : current);
       setForm(current => ({
         ...current,
-        format: fresh.format || current.format,
+        format: fresh.format || '',
         title: fresh.title || current.title,
         display_title: '',
         episodes_total_manual: '',

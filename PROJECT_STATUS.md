@@ -24,6 +24,7 @@ A estrutura foi reorganizada de acordo com os mockups enviados:
 
 - Aplicação React + Vite.
 - Pesquisa e detalhes de catálogo via funções serverless da Vercel, Jikan como fonte principal e AniList como fallback.
+- Endpoint serverless adicional para temporada atual, próximos lançamentos, populares e gêneros na área Descobrir.
 - Página de Descobrir com rotas de temporada, popularidade, próximos lançamentos e gêneros.
 - Biblioteca com filtros, ordenação e alternância grade/lista.
 - Progresso de episódios, status, nota, datas, reassistidas, título de exibição, total manual e anotações.

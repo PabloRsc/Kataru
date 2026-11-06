@@ -16,6 +16,21 @@ export default async function handler(req, res) {
   try {
     const result = await requestJikan('/anime/' + numericId + '/full');
     let anime = result.data;
+    // Jikan's total is often null while a series is airing. Fetch the last catalogued aired episode separately.
+    try {
+      const firstPage = await requestJikan('/anime/' + numericId + '/episodes?page=1');
+      const lastPageNumber = Math.max(1, Number(firstPage.data.pagination?.last_visible_page || 1));
+      const lastPage = lastPageNumber > 1
+        ? await requestJikan('/anime/' + numericId + '/episodes?page=' + lastPageNumber)
+        : firstPage;
+      const airedEpisodes = (lastPage.data.data || [])
+        .filter(episode => episode.aired && new Date(episode.aired).getTime() <= Date.now())
+        .map(episode => Number(episode.mal_id))
+        .filter(number => Number.isFinite(number) && number > 0);
+      if (airedEpisodes.length) anime = { ...anime, episodes_available: Math.max(...airedEpisodes) };
+    } catch {
+      anime = { ...anime, episodes_available: null };
+    }
     if (anime.episodes == null) {
       try {
         const alternate = await fetchAniListByMalId(numericId);
@@ -26,7 +41,7 @@ export default async function handler(req, res) {
       }
     }
     res.setHeader('X-Kataru-Catalog-Source', 'jikan');
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+    res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
     return res.status(200).json(anime);
   } catch (jikanError) {
     try {

@@ -60,4 +60,4 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 
 ## Verificação
 
-As alterações foram publicadas diretamente na branch main do GitHub. A arquitetura com fallback AniList foi publicada na branch main e aguarda validação no próximo deploy da Vercel. Build e testes automatizados ainda não foram executados neste ambiente.
+As alterações foram publicadas diretamente na branch main do GitHub. A arquitetura com fallback AniList, enriquecimento de episódios disponíveis, controles rápidos de progresso/status e melhorias responsivas da interface foram publicadas na branch main. Aguardar deploy Ready e validar pesquisa, detalhes e gravação de progresso. Build e testes automatizados ainda não foram executados neste ambiente.

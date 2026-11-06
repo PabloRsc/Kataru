@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       const media = await fetchAniListByMalId(numericId);
       res.setHeader('X-Kataru-Catalog-Source', 'anilist-fallback');
       res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
-      return res.status(200).json(toJikanShape(media));
+      return res.status(200).json({ data: toJikanShape(media) });
     } catch (fallbackError) {
       fallbackError.status = 502;
       fallbackError.message = 'Não foi possível obter os detalhes deste anime nos catálogos disponíveis.';

@@ -57,7 +57,10 @@ npm run preview
 
 - `src/App.jsx`: interface, coleção, pesquisa e edição.
 - `src/AuthGate.jsx`: cadastro, login, redefinição de senha e sessão.
-- `src/api.js`: cliente do catálogo via API própria.\n- `api/anime/`: funções serverless para pesquisa e detalhes.\n- `server/jikan.js`: cliente server-side com timeout e retry.\n- `vite.config.js`: proxy local para as rotas de catálogo.
+- `src/api.js`: cliente do catálogo via API própria.
+- `api/anime/`: funções serverless para pesquisa e detalhes.
+- `server/jikan.js`: cliente server-side com timeout e retry.
+- `vite.config.js`: proxy local para as rotas de catálogo.
 - `src/storage.js`: persistência local ou Supabase por usuário.
 - `src/styles.css`: estilos.
 - `supabase/schema.sql`: esquema e políticas RLS.

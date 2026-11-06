@@ -11,6 +11,8 @@ const MEDIA_FIELDS = `
   season
   genres
   averageScore
+  status
+  nextAiringEpisode { episode airingAt }
 `;
 
 async function queryAniList(query, variables) {
@@ -68,7 +70,8 @@ export function toJikanShape(item) {
       jpg: { large_image_url: item.coverImage?.large || '' }
     },
     synopsis: (item.description || '').replace(/<[^>]*>/g, ''),
-    episodes: item.episodes ?? null,
+    episodes: item.episodes ?? (item.status === 'RELEASING' && item.nextAiringEpisode?.episode ? item.nextAiringEpisode.episode - 1 : null),
+    status: item.status || null,
     year: item.seasonYear ?? null,
     season: item.season?.toLowerCase() || null,
     genres: (item.genres || []).map(name => ({ name })),

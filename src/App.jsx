@@ -683,7 +683,7 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
 }
 
 function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd }) {
-  const featured = watching[0] || recentlyUpdated[0] || null;
+  const featured = watching[0] || null;
   const episodesWatched = items.reduce((sum, anime) => sum + Number(anime.episode_current || 0), 0);
   const nextEpisode = featured ? Number(featured.episode_current || 0) + 1 : 1;
 
@@ -855,7 +855,7 @@ function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGe
   }));
   const preferredGenres = Object.entries(genreAffinity).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name]) => name);
   const recommendations = results
-    .filter(anime => !isInCollection(anime))
+    .filter(anime => !isInCollection(anime) && String(anime.mal_id) !== String(results[0]?.mal_id))
     .map(anime => ({ ...anime, _matchScore: (anime.genres || []).filter(genre => preferredGenres.includes(genre)).length }))
     .filter(anime => anime._matchScore > 0)
     .sort((a, b) => b._matchScore - a._matchScore || Number(b.score_external || 0) - Number(a.score_external || 0))
@@ -1141,8 +1141,9 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose }) {
         {showProgress && <>
           <div className="editor-grid progress-editor-grid">
             <label className="field"><span>{form.status === 'completed' ? 'Episódios assistidos' : 'Episódio atual'}</span><div className="number-stepper"><button type="button" onClick={() => update('episode_current', Math.max(0, nextEpisode - 1))}>−</button><input type="number" min="0" max={total || undefined} value={form.episode_current} onChange={event => update('episode_current', event.target.value)} /><button type="button" onClick={() => update('episode_current', Math.min(total || 99999, nextEpisode + 1))}>+</button></div><small>{total ? 'de ' + total.toLocaleString('pt-BR') + ' episódios' : 'Total ainda não informado'}</small></label>
-            {total > 0 && <div className="field episode-quick-actions"><span>Preenchimento rápido</span><div className="quick-action-buttons"><button type="button" onClick={() => update('episode_current', 0)}>Comecei no ep. 1</button>{catalogTotal > 0 && <button type="button" onClick={() => update('episode_current', Math.max(0, catalogTotal - 1))}>Comecei pelo último</button>}</div></div>}
+            {total > 0 && <div className="field episode-quick-actions"><span>Preenchimento rápido</span><div className="quick-action-buttons"><button type="button" onClick={() => update('episode_current', 0)}>Comecei no ep. 1</button>{catalogTotal > 0 && <button type="button" onClick={() => update('episode_current', catalogTotal)}>Até o último episódio disponível</button>}</div></div>}
           </div>
+          {total > 0 && nextEpisode >= total && form.status === 'watching' && <p className="progress-complete-hint"><Check size={13} />Você chegou ao total informado. Considere mudar o status para Assistido.</p>}
           <div className="field total-mode-field">
             <span>Total de episódios</span>
             <div className="total-mode-options">

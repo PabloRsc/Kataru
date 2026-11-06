@@ -15,9 +15,19 @@ export default async function handler(req, res) {
 
   try {
     const result = await requestJikan('/anime/' + numericId + '/full');
+    let anime = result.data;
+    if (anime.episodes == null) {
+      try {
+        const alternate = await fetchAniListByMalId(numericId);
+        const extra = toJikanShape(alternate);
+        if (extra.episodes != null) anime = { ...anime, episodes: extra.episodes };
+      } catch {
+        // Preserve primary metadata when optional episode enrichment is unavailable.
+      }
+    }
     res.setHeader('X-Kataru-Catalog-Source', 'jikan');
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
-    return res.status(200).json(result.data);
+    return res.status(200).json(anime);
   } catch (jikanError) {
     try {
       const media = await fetchAniListByMalId(numericId);

@@ -95,6 +95,7 @@ export default function App() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
+  const [toastAction, setToastAction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [discoverTab, setDiscoverTab] = useState('current');
   const [discoverResults, setDiscoverResults] = useState([]);
@@ -141,9 +142,13 @@ export default function App() {
     return () => { active = false; };
   }, [page, discoverTab, discoverGenre, discoverReload]);
 
-  function notify(message) {
+  function notify(message, action = null) {
     setToast(message);
-    window.setTimeout(() => setToast(''), 3000);
+    setToastAction(action);
+    window.setTimeout(() => {
+      setToast('');
+      setToastAction(null);
+    }, 3600);
   }
 
   const counts = useMemo(() => {
@@ -275,7 +280,9 @@ export default function App() {
         mal_id: Number(editor.mal_id),
         title: form.is_manual ? form.title.trim() : (editor.title || form.title),
         display_title: form.display_title.trim() || null,
-        episode_current: Math.max(0, Number(form.episode_current || 0)),
+        episode_current: form.status === 'completed' && selectedTotal
+          ? selectedTotal
+          : Math.max(0, Number(form.episode_current || 0)),
         episodes_total_manual: form.episodes_total_mode === 'manual' && form.episodes_total_manual !== '' ? Math.max(1, Number(form.episodes_total_manual)) : null,
         rewatch_count: Math.max(0, Number(form.rewatch_count || 0)),
         rating_personal: form.rating_personal === '' ? null : Number(form.rating_personal),
@@ -310,14 +317,14 @@ export default function App() {
     }
   }
 
-  async function persistAnime(anime, message) {
+  async function persistAnime(anime, message, undoAction = null) {
     try {
       await saveAnime({ ...anime, updated_at: new Date().toISOString() });
       const latest = await getAnimeList();
       setItems(latest);
       const current = latest.find(item => String(item.mal_id) === String(anime.mal_id)) || anime;
       if (selected && String(selected.mal_id) === String(anime.mal_id)) setSelected(current);
-      notify(message || 'Alterações salvas.');
+      notify(message || 'Alterações salvas.', undoAction);
       return current;
     } catch (error) {
       notify(error.message || 'Não foi possível salvar as alterações.');
@@ -330,8 +337,50 @@ export default function App() {
     const total = totalEpisodes(anime);
     if (total && next > total) return;
     let updated = { ...anime, episode_current: next };
-    if (total && next >= total) { updated.status = 'completed'; updated.completed_at = updated.completed_at || new Date().toISOString().slice(0, 10); }
-    return persistAnime(updated, 'Progresso atualizado.');
+    if (total && next >= total) {
+      updated.status = 'completed';
+      updated.completed_at = updated.completed_at || new Date().toISOString().slice(0, 10);
+    } else if (updated.status === 'completed') {
+      updated.status = 'watching';
+      updated.completed_at = null;
+    }
+    return persistAnime(updated, 'Progresso atualizado.', () => persistAnime(anime, 'Progresso restaurado.'));
+  }
+
+  async function restoreCatalogInEditor() {
+    if (!editor || editor.is_manual) return false;
+    try {
+      const fresh = await fetchAnime(editor.mal_id);
+      setEditor(current => current ? {
+        ...current,
+        ...fresh,
+        id: current.id,
+        mal_id: current.mal_id,
+        created_at: current.created_at,
+        status: current.status,
+        episode_current: current.episode_current,
+        rating_personal: current.rating_personal,
+        notes: current.notes,
+        display_title: current.display_title,
+        episodes_total_manual: current.episodes_total_manual,
+        rewatch_count: current.rewatch_count,
+        started_at: current.started_at,
+        completed_at: current.completed_at,
+        is_manual: false
+      } : current);
+      setForm(current => ({
+        ...current,
+        format: fresh.format || current.format,
+        episodes_total_mode: current.episodes_total_mode === 'manual'
+          ? 'manual'
+          : fresh.episodes_total ? 'catalog' : 'unknown'
+      }));
+      notify('Dados do catálogo recarregados. Salve as alterações para aplicar.');
+      return true;
+    } catch (error) {
+      notify(error.message || 'Não foi possível restaurar os dados do catálogo.');
+      return false;
+    }
   }
 
   async function changeStatus(anime, status) {
@@ -665,6 +714,7 @@ export default function App() {
           saving={saving}
           onSubmit={submitAnime}
           onClose={() => { setEditor(null); setPendingListId(null); }}
+          onRestoreCatalog={restoreCatalogInEditor}
         />
       )}
 
@@ -679,7 +729,7 @@ export default function App() {
         />
       )}
 
-      {toast && <div className="toast"><Check size={16} />{toast}</div>}
+      {toast && <div className="toast"><Check size={16} /><span>{toast}</span>{toastAction && <button type="button" onClick={toastAction}>Desfazer</button>}</div>}
     </div>
   );
 }
@@ -1099,11 +1149,12 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
   );
 }
 
-function EditorModal({ anime, form, setForm, saving, onSubmit, onClose }) {
+function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestoreCatalog }) {
+  const [catalogRestored, setCatalogRestored] = useState(false);
   const update = (key, value) => setForm(current => ({ ...current, [key]: value }));
   const today = new Date().toISOString().slice(0, 10);
   const isNew = !anime.created_at;
-  const isDirty = !isNew && (
+  const isDirty = catalogRestored || (!isNew && (
     form.status !== (anime.status || 'planned') ||
     String(form.episode_current ?? 0) !== String(anime.episode_current ?? 0) ||
     String(form.rating_personal ?? '') !== String(anime.rating_personal ?? '') ||
@@ -1117,7 +1168,7 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose }) {
     String(form.format || '') !== String(anime.format || '') ||
     String(form.title || '') !== String(anime.title || '') ||
     Boolean(form.is_manual) !== Boolean(anime.is_manual)
-  );
+  ));
   const nextEpisode = Number(form.episode_current || 0);
   const catalogTotal = Number(anime.episodes_total || 0);
   const manualTotal = Number(form.episodes_total_manual || 0);
@@ -1180,7 +1231,7 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose }) {
         </div>
         <div className="editor-section rating-editor"><div><span className="field-label">Sua nota</span><small>Uma avaliação pessoal de 1 a 5 estrelas.</small></div><StarRating value={form.rating_personal ? Math.round(Number(form.rating_personal) / 2) : 0} onChange={stars => update('rating_personal', stars ? stars * 2 : '')} /></div>
         <label className="field notes-field"><span>Anotações</span><textarea rows="3" value={form.notes} onChange={event => update('notes', event.target.value)} placeholder="Guarde suas impressões, momentos favoritos ou onde parou..." /></label>
-        {!form.is_manual && <p className="editor-catalog-note">Título original, pôster e sinopse vêm do catálogo e não são editáveis.</p>}
+        {!form.is_manual && <div className="editor-catalog-actions"><p className="editor-catalog-note">Título original, pôster e sinopse vêm do catálogo e não são editáveis.</p><button type="button" className="text-button" onClick={async () => { const restored = await onRestoreCatalog(); if (restored) setCatalogRestored(true); }}>Restaurar dados do catálogo</button></div>}
         <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancelar</button><button className="primary-button" disabled={saving}>{saving ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{isNew ? 'Adicionar à biblioteca' : 'Salvar alterações'}</button></div>
       </form>
     </div>

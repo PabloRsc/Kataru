@@ -595,10 +595,18 @@ export default function App() {
           searching={searching}
           error={searchError}
           onSearch={doSearch}
-          onClose={() => setSearchOpen(false)}
-          onAdd={startAdd}
+          onClose={() => { setSearchOpen(false); setPendingListId(null); }}
+          onAdd={result => {
+            const existing = items.find(item => String(item.mal_id) === String(result.mal_id));
+            if (pendingListId && existing) {
+              addAnimeToList(existing, pendingListId);
+              setPendingListId(null);
+              setSearchOpen(false);
+            } else startAdd(result);
+          }}
           onManual={startManualAdd}
           isInCollection={isInCollection}
+          allowExisting={Boolean(pendingListId)}
         />
       )}
 
@@ -977,7 +985,7 @@ function StarRating({ value, onChange }) {
   return <div className="star-rating" role="group" aria-label="Sua nota de zero a cinco estrelas">{[1, 2, 3, 4, 5].map(star => <button key={star} className={star <= value ? 'filled' : ''} onClick={() => onChange(star === value ? 0 : star)} aria-label={star + ' estrelas'}><Star size={23} fill={star <= value ? 'currentColor' : 'none'} /></button>)}</div>;
 }
 
-function SearchModal({ query, setQuery, results, searching, error, onSearch, onClose, onAdd, onManual, isInCollection }) {
+function SearchModal({ query, setQuery, results, searching, error, onSearch, onClose, onAdd, onManual, isInCollection, allowExisting }) {
   return (
     <div className="overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="modal search-modal">
@@ -988,10 +996,11 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
         {searching && <div className="loading-block compact-loading"><LoaderCircle className="spin" />Buscando resultados...</div>}
         {results.length > 0 && <div className="results-list">{results.map(result => {
           const exists = isInCollection(result);
+          const canAddToList = exists && allowExisting;
           return <article className="result-row" key={result.mal_id}>
             {result.image_url ? <img src={result.image_url} alt="" /> : <div className="result-cover-fallback"><Clapperboard size={18} /></div>}
             <div className="result-info"><strong>{displayTitle(result)}</strong>{result.title_english && result.title_english !== result.title && <span>{result.title_english}</span>}<small>{result.year || 'Ano não informado'} · {result.episodes_total ?? '?'} episódios · {result.format || 'Anime'}</small></div>
-            <button className={exists ? 'outline-button result-added' : 'outline-button'} disabled={exists} onClick={() => onAdd(result)}>{exists ? <><Check size={14} />Na biblioteca</> : <><Plus size={14} />Adicionar</>}</button>
+            <button className={exists && !canAddToList ? 'outline-button result-added' : 'outline-button'} disabled={exists && !canAddToList} onClick={() => onAdd(result)}>{canAddToList ? <><Plus size={14} />Adicionar à lista</> : exists ? <><Check size={14} />Na biblioteca</> : <><Plus size={14} />Adicionar</>}</button>
           </article>;
         })}</div>}
         {!searching && !error && !results.length && <div className="search-empty"><Search size={25} /><p>Digite um título para começar a busca.</p><button className="text-link" onClick={onManual}>Não encontrou? Adicionar manualmente <ArrowRight size={13} /></button></div>}

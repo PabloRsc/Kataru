@@ -255,6 +255,17 @@ export default function App() {
       notify('Informe o título do anime.');
       return;
     }
+    if (form.episodes_total_mode === 'manual' && (!Number(form.episodes_total_manual) || Number(form.episodes_total_manual) < 1)) {
+      notify('Informe um total de episódios válido ou escolha outra opção.');
+      return;
+    }
+    const selectedTotal = form.episodes_total_mode === 'manual'
+      ? Number(form.episodes_total_manual)
+      : form.episodes_total_mode === 'catalog' ? Number(editor.episodes_total || 0) : 0;
+    if (selectedTotal && Number(form.episode_current || 0) > selectedTotal) {
+      notify('O episódio atual não pode ser maior que o total informado.');
+      return;
+    }
     setSaving(true);
     try {
       const anime = {
@@ -396,7 +407,11 @@ export default function App() {
         updated_at: new Date().toISOString()
       };
       await saveAnimeList(payload);
-      setLists(await getAnimeLists());
+      const refreshed = await getAnimeLists();
+      setLists(refreshed);
+      if (activeList && String(activeList.id) === String(payload.id)) {
+        setActiveList(refreshed.find(item => String(item.id) === String(payload.id)) || payload);
+      }
       setListEditorOpen(false);
       setListEditing(null);
       notify(listEditing ? 'Lista atualizada.' : 'Lista criada.');
@@ -944,7 +959,7 @@ function ListsPage({ items, lists, counts, onOpenStatus, onOpenList, onNewList, 
           return <article className="custom-list-card" key={list.id}>
             <button className="custom-list-open" onClick={() => onOpenList(list)}>
               <div className="list-cover-stack">{covers.length ? covers.map((anime, index) => <img key={anime.id} style={{ left: (index * 35) + 'px', zIndex: 5 - index }} src={anime.image_url} alt="" />) : <span><ListPlus size={26} /></span>}</div>
-              <div className="custom-list-info"><strong>{list.name}</strong><small>{list.description || 'Sem descrição'}</small><span>{count} {count === 1 ? 'anime' : 'animes'} · {list.is_public ? 'Pública' : 'Privada'}</span></div>
+              <div className="custom-list-info"><strong>{list.name}</strong><small>{list.description || 'Sem descrição'}</small><span>{count} {count === 1 ? 'anime' : 'animes'} · {list.is_public ? 'Pública · não compartilhável' : 'Privada'}</span></div>
             </button>
             <button className="list-more" onClick={() => onEditList(list)} aria-label="Editar lista"><MoreHorizontal size={18} /></button>
           </article>;
@@ -963,7 +978,7 @@ function CustomListDetail({ list, items, onBack, onEdit, onDelete, onOpenAnime, 
       <button className="back-link" onClick={onBack}><ChevronLeft size={16} />Voltar para listas</button>
       <div className="custom-list-heading">
         <div className="list-heading-icon"><ListPlus size={28} /></div>
-        <div className="list-heading-copy"><p className="eyebrow">MINHA LISTA{list.is_ranked ? ' · RANQUEADA' : ''}</p><h1>{list.name}<span className="heading-dot">.</span></h1><p>{list.description || 'Uma coleção organizada do seu jeito.'}</p><span className="list-visibility">{list.is_public ? 'Pública' : 'Privada'} · {entries.length} {entries.length === 1 ? 'anime' : 'animes'}{list.is_ranked ? ' · em ordem de preferência' : ''}</span></div>
+        <div className="list-heading-copy"><p className="eyebrow">MINHA LISTA{list.is_ranked ? ' · RANQUEADA' : ''}</p><h1>{list.name}<span className="heading-dot">.</span></h1><p>{list.description || 'Uma coleção organizada do seu jeito.'}</p><span className="list-visibility">{list.is_public ? 'Pública · compartilhamento indisponível' : 'Privada'} · {entries.length} {entries.length === 1 ? 'anime' : 'animes'}{list.is_ranked ? ' · em ordem de preferência' : ''}</span></div>
         <div className="list-heading-actions"><button className="outline-button" onClick={onEdit}><Pencil size={14} />Editar</button><button className="icon-button danger" onClick={onDelete} aria-label="Excluir lista"><Trash2 size={16} /></button></div>
       </div>
       <div className="section-heading list-detail-subhead"><div><h2>Animes desta lista</h2><p>Os títulos continuam salvos na sua biblioteca.</p></div><button className="primary-button" onClick={onAdd}><Plus size={15} />Adicionar anime</button></div>
@@ -1095,6 +1110,7 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose }) {
     String(form.notes || '') !== String(anime.notes || '') ||
     String(form.display_title || '') !== String(anime.display_title || '') ||
     String(form.episodes_total_manual ?? '') !== String(anime.episodes_total_manual ?? '') ||
+    String(form.episodes_total_mode || 'unknown') !== (anime.episodes_total_manual ? 'manual' : anime.episodes_total ? 'catalog' : 'unknown') ||
     String(form.rewatch_count ?? 0) !== String(anime.rewatch_count ?? 0) ||
     String(form.started_at || '') !== String(anime.started_at || '') ||
     String(form.completed_at || '') !== String(anime.completed_at || '') ||

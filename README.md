@@ -37,7 +37,7 @@ A tela de conta inclui cadastro, login, redefinição de senha e saída. Com Sup
 
 ## Catálogo
 
-A pesquisa e atualização manual passam por funções serverless da Vercel (`/api/anime`). O servidor consulta a Jikan API, uma API não oficial para dados do MyAnimeList, com timeout, uma nova tentativa em falhas temporárias e cache HTTP (5 minutos para pesquisas e 1 hora para detalhes). No desenvolvimento local, o Vite encaminha `/api/anime` para a Jikan. A Jikan continua sendo uma dependência externa e pode ficar indisponível; nesse caso o app mostra uma mensagem amigável.
+A pesquisa e atualização manual passam por funções serverless da Vercel (`/api/anime`). A fonte principal é a Jikan API; se ela falhar, o servidor consulta a AniList GraphQL como alternativa. Os dois provedores são normalizados para o formato usado pelo app e a alternativa só retorna títulos que possuem ID do MyAnimeList, preservando a compatibilidade com a coleção atual. Há timeout, retry limitado na Jikan e cache HTTP (5 minutos para pesquisas e 1 hora para detalhes). No desenvolvimento local, o Vite encaminha `/api/anime` para a Jikan; a alternativa AniList é executada nas funções serverless da Vercel.
 
 ## Próximas melhorias
 
@@ -59,7 +59,7 @@ npm run preview
 - `src/AuthGate.jsx`: cadastro, login, redefinição de senha e sessão.
 - `src/api.js`: cliente do catálogo via API própria.
 - `api/anime/`: funções serverless para pesquisa e detalhes.
-- `server/jikan.js`: cliente server-side com timeout e retry.
+- `server/jikan.js`: cliente Jikan server-side com timeout e retry.\n- `server/anilist.js`: fonte alternativa via AniList GraphQL e normalização dos dados.
 - `vite.config.js`: proxy local para as rotas de catálogo.
 - `src/storage.js`: persistência local ou Supabase por usuário.
 - `src/styles.css`: estilos.

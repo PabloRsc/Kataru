@@ -42,7 +42,12 @@ export async function saveAnime(anime) {
     const row = toRow(anime, user.id);
     const { data, error } = await supabase.from('anime_collection')
       .upsert(row, { onConflict: 'owner_id,mal_id' }).select().single();
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST204' || error.code === '42703' || /schema cache|column .* does not exist/i.test(error.message || '')) {
+        throw new Error('O banco do Kataru está desatualizado. Faça backup e execute o arquivo supabase/redesign-migration.sql no SQL Editor do Supabase.');
+      }
+      throw error;
+    }
     return fromRow(data);
   }
   const all = await getAnimeList();
@@ -91,7 +96,12 @@ export async function saveAnimeList(list) {
     const payload = toListRow(list, user.id);
     const { data, error } = await supabase.from('anime_lists')
       .upsert(payload, { onConflict: 'owner_id,id' }).select().single();
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205' || error.code === 'PGRST204' || error.code === '42703') {
+        throw new Error('As listas ainda não estão configuradas no Supabase. Execute o arquivo supabase/redesign-migration.sql no SQL Editor.');
+      }
+      throw error;
+    }
     return fromListRow(data);
   }
   const all = await getAnimeLists();
@@ -186,7 +196,6 @@ function toListRow(list, ownerId) {
     owner_id: ownerId,
     name: String(list.name || '').trim(),
     description: list.description || null,
-    is_public: Boolean(list.is_public),
     is_ranked: Boolean(list.is_ranked),
     anime_ids: Array.from(new Set((list.anime_ids || []).map(String))),
     created_at: list.created_at || new Date().toISOString(),
@@ -195,5 +204,5 @@ function toListRow(list, ownerId) {
 }
 
 function fromListRow(row) {
-  return { ...row, id: String(row.id), anime_ids: (row.anime_ids || []).map(String), is_public: Boolean(row.is_public), is_ranked: Boolean(row.is_ranked) };
+  return { ...row, id: String(row.id), anime_ids: (row.anime_ids || []).map(String), is_ranked: Boolean(row.is_ranked) };
 }

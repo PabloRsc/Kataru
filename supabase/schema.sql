@@ -12,6 +12,7 @@ create table if not exists public.anime_collection (
   synopsis text,
   episodes_total integer,
   episodes_total_manual integer,
+  episodes_available integer,
   year integer,
   season text,
   format text,
@@ -36,6 +37,7 @@ create table if not exists public.anime_collection (
 alter table public.anime_collection add column if not exists owner_id uuid references auth.users(id) on delete cascade;
 alter table public.anime_collection add column if not exists display_title text;
 alter table public.anime_collection add column if not exists episodes_total_manual integer;
+alter table public.anime_collection add column if not exists episodes_available integer;
 alter table public.anime_collection add column if not exists format text;
 alter table public.anime_collection add column if not exists studios text[] not null default '{}';
 alter table public.anime_collection add column if not exists rewatch_count integer not null default 0;
@@ -74,7 +76,6 @@ create table if not exists public.anime_lists (
   owner_id uuid not null references auth.users(id) on delete cascade,
   name text not null check (char_length(name) between 1 and 60),
   description text,
-  is_public boolean not null default false,
   is_ranked boolean not null default false,
   anime_ids text[] not null default '{}',
   created_at timestamptz not null default now(),
@@ -105,4 +106,3 @@ create policy "Users can delete their own anime lists" on public.anime_lists
 
 -- Registros antigos sem owner_id permanecem inacessíveis até serem atribuídos
 -- manualmente ao usuário correto. Não os associe automaticamente a uma conta.
--- "is_public" guarda a preferência; não habilita leitura anônima nesta versão.

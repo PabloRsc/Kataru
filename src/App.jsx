@@ -23,15 +23,10 @@ const STATUSES = [
 const EMPTY_FORM = {
   status: 'planned',
   episode_current: 0,
-  episodes_total_mode: 'unknown',
   rating_personal: '',
-  notes: '',
-  display_title: '',
-  episodes_total_manual: '',
   rewatch_count: 0,
   started_at: '',
   completed_at: '',
-  format: '',
   title: '',
   is_manual: false
 };
@@ -91,6 +86,8 @@ export default function App() {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const searchRequestRef = useRef(0);
+  const availabilityRequestsRef = useRef(new Set());
   const [editor, setEditor] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -108,7 +105,7 @@ export default function App() {
   const [discoverError, setDiscoverError] = useState('');
   const [listEditorOpen, setListEditorOpen] = useState(false);
   const [listEditing, setListEditing] = useState(null);
-  const [listForm, setListForm] = useState({ name: '', description: '', is_public: false, is_ranked: false });
+  const [listForm, setListForm] = useState({ name: '', description: '', is_ranked: false });
   const [listSaving, setListSaving] = useState(false);
   const [pendingListId, setPendingListId] = useState(null);
 
@@ -123,6 +120,34 @@ export default function App() {
       .catch(error => { if (mounted) { setLists([]); notify(error.message || 'Não foi possível carregar suas listas.'); } });
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => {
+    if (!searchOpen) return undefined;
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setResults([]);
+      setSearchError('');
+      setSearching(false);
+      return undefined;
+    }
+    const requestId = ++searchRequestRef.current;
+    setResults([]);
+    setSearchError('');
+    const timer = window.setTimeout(() => {
+      setSearching(true);
+      searchAnime(q)
+        .then(data => {
+          if (requestId === searchRequestRef.current) setResults(data || []);
+        })
+        .catch(error => {
+          if (requestId === searchRequestRef.current) setSearchError(error.message || 'Erro ao pesquisar o catálogo.');
+        })
+        .finally(() => {
+          if (requestId === searchRequestRef.current) setSearching(false);
+        });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [searchOpen, searchQuery]);
 
   useEffect(() => {
     if (page !== 'discover') return undefined;
@@ -143,6 +168,37 @@ export default function App() {
     }
     return () => { active = false; };
   }, [page, discoverTab, discoverGenre, discoverReload]);
+
+  useEffect(() => {
+    items.filter(anime =>
+      anime.status === 'watching' &&
+      !anime.is_manual &&
+      !anime.episodes_available &&
+      !totalEpisodes(anime)
+    ).forEach(anime => {
+      const id = String(anime.mal_id);
+      if (availabilityRequestsRef.current.has(id)) return;
+      availabilityRequestsRef.current.add(id);
+      fetchAnime(anime.mal_id).then(async fresh => {
+        if (!fresh.episodes_available) return;
+        const merged = {
+          ...anime,
+          ...fresh,
+          id: anime.id,
+          status: anime.status,
+          episode_current: anime.episode_current,
+          rating_personal: anime.rating_personal,
+          rewatch_count: anime.rewatch_count,
+          started_at: anime.started_at,
+          completed_at: anime.completed_at,
+          episodes_available: fresh.episodes_available
+        };
+        await saveAnime(merged);
+        setItems(current => current.map(item => String(item.mal_id) === id ? merged : item));
+        setSelected(current => current && String(current.mal_id) === id ? merged : current);
+      }).catch(() => {});
+    });
+  }, [items]);
 
   function notify(message, action = null) {
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
@@ -213,8 +269,6 @@ export default function App() {
       ...EMPTY_FORM,
       status: 'planned',
       episode_current: 0,
-      episodes_total_mode: result.episodes_total ? 'catalog' : 'unknown',
-      format: result.format || '',
       title: result.title || ''
     });
     setSearchOpen(false);
@@ -234,32 +288,16 @@ export default function App() {
       status: anime.status || 'planned',
       episode_current: anime.episode_current ?? 0,
       rating_personal: anime.rating_personal ?? '',
-      notes: anime.notes || '',
-      display_title: anime.display_title || '',
-      episodes_total_manual: anime.episodes_total_manual ?? '',
-      episodes_total_mode: anime.episodes_total_manual ? 'manual' : anime.episodes_total ? 'catalog' : 'unknown',
       rewatch_count: anime.rewatch_count ?? 0,
       started_at: anime.started_at || '',
       completed_at: anime.completed_at || '',
-      format: anime.format || '',
       title: anime.title || '',
       is_manual: Boolean(anime.is_manual)
     });
   }
 
-  async function doSearch(event) {
+  function doSearch(event) {
     event?.preventDefault();
-    if (!searchQuery.trim()) return;
-    setSearching(true);
-    setSearchError('');
-    setResults([]);
-    try {
-      setResults(await searchAnime(searchQuery.trim()));
-    } catch (error) {
-      setSearchError(error.message || 'Erro ao pesquisar o catálogo.');
-    } finally {
-      setSearching(false);
-    }
   }
 
   async function submitAnime(event) {
@@ -269,42 +307,27 @@ export default function App() {
       notify('Informe o título do anime.');
       return;
     }
-    if (form.episodes_total_mode === 'manual' && (!Number(form.episodes_total_manual) || Number(form.episodes_total_manual) < 1)) {
-      notify('Informe um total de episódios válido ou escolha outra opção.');
-      return;
-    }
-    const selectedTotal = form.episodes_total_mode === 'manual'
-      ? Number(form.episodes_total_manual)
-      : form.episodes_total_mode === 'catalog' ? Number(editor.episodes_total || 0) : 0;
-    if (selectedTotal && Number(form.episode_current || 0) > selectedTotal) {
-      notify('O episódio atual não pode ser maior que o total informado.');
-      return;
-    }
     setSaving(true);
     try {
+      const catalogTotal = totalEpisodes(editor);
+      const available = Number(editor.episodes_available || 0) || null;
+      const completedCount = catalogTotal || available || Number(editor.episode_current || 0);
       const anime = {
         ...editor,
         ...form,
         id: String(editor.id || editor.mal_id),
         mal_id: Number(editor.mal_id),
         title: form.is_manual ? form.title.trim() : (editor.title || form.title),
-        display_title: form.display_title.trim() || null,
-        episode_current: form.status === 'completed' && selectedTotal
-          ? selectedTotal
+        episode_current: form.status === 'planned' ? 0
+          : form.status === 'completed' ? completedCount
           : Math.max(0, Number(form.episode_current || 0)),
-        episodes_total_manual: form.episodes_total_mode === 'manual' && form.episodes_total_manual !== '' ? Math.max(1, Number(form.episodes_total_manual)) : null,
-        rewatch_count: Math.max(0, Number(form.rewatch_count || 0)),
         rating_personal: form.rating_personal === '' ? null : Number(form.rating_personal),
-        started_at: form.started_at || null,
-        completed_at: form.completed_at || null,
-        notes: form.notes || '',
-        format: form.format || editor.format || null,
-        is_manual: Boolean(form.is_manual),
+        rewatch_count: form.status === 'completed' ? Math.max(0, Number(form.rewatch_count || 0)) : Number(editor.rewatch_count || 0),
+        started_at: form.status === 'watching' ? (form.started_at || new Date().toISOString().slice(0, 10)) : editor.started_at || null,
+        completed_at: form.status === 'completed' ? (form.completed_at || new Date().toISOString().slice(0, 10)) : null,
         updated_at: new Date().toISOString(),
         created_at: editor.created_at || new Date().toISOString()
       };
-      if (anime.status === 'completed' && !anime.completed_at) anime.completed_at = new Date().toISOString().slice(0, 10);
-      if (anime.status === 'watching' && !anime.started_at) anime.started_at = new Date().toISOString().slice(0, 10);
       const saved = await saveAnime(anime);
       const latest = await getAnimeList();
       setItems(latest);
@@ -344,7 +367,12 @@ export default function App() {
   async function changeEpisode(anime, delta) {
     const next = Math.max(0, Number(anime.episode_current || 0) + delta);
     const total = totalEpisodes(anime);
-    if (total && next > total) return;
+    const available = Number(anime.episodes_available || 0) || null;
+    const limit = total || available;
+    if (limit && next > limit) {
+      notify('Você já chegou ao último episódio disponível informado pelo catálogo.');
+      return;
+    }
     let updated = { ...anime, episode_current: next };
     if (total && next >= total) {
       updated.status = 'completed';
@@ -397,7 +425,7 @@ export default function App() {
     const updated = { ...anime, status };
     if (status === 'completed') {
       const total = totalEpisodes(anime);
-      if (total) updated.episode_current = total;
+      updated.episode_current = total || Number(anime.episodes_available || 0) || Number(anime.episode_current || 0);
       if (!updated.completed_at) updated.completed_at = new Date().toISOString().slice(0, 10);
     }
     if (status === 'watching' && !updated.started_at) updated.started_at = new Date().toISOString().slice(0, 10);
@@ -437,6 +465,7 @@ export default function App() {
         notes: anime.notes,
         display_title: anime.display_title,
         episodes_total_manual: anime.episodes_total_manual,
+        episodes_available: fresh.episodes_available ?? anime.episodes_available ?? null,
         rewatch_count: anime.rewatch_count,
         started_at: anime.started_at,
         completed_at: anime.completed_at,
@@ -460,7 +489,7 @@ export default function App() {
         ...(listEditing || {}),
         name: listForm.name.trim(),
         description: listForm.description.trim(),
-        is_public: Boolean(listForm.is_public),
+        is_public: false,
         is_ranked: Boolean(listForm.is_ranked),
         anime_ids: listEditing?.anime_ids || [],
         updated_at: new Date().toISOString()
@@ -486,7 +515,6 @@ export default function App() {
     setListForm({
       name: list?.name || '',
       description: list?.description || '',
-      is_public: Boolean(list?.is_public),
       is_ranked: Boolean(list?.is_ranked)
     });
     setListEditorOpen(true);
@@ -562,7 +590,7 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <button className="brand" onClick={() => navigate('home')} aria-label="Kataru — início">
-          <span className="brand-mark"><Clapperboard size={19} strokeWidth={2.2} /></span>
+          <span className="brand-mark"><KataruMark size={25} /></span>
           <span className="brand-name">kataru<span>.</span></span>
         </button>
         <nav className="main-nav" aria-label="Navegação principal">
@@ -739,7 +767,7 @@ export default function App() {
         />
       )}
 
-      {toast && <div className="toast"><Check size={16} /><span>{toast}</span>{toastAction && <button type="button" disabled={toastActionBusy} onClick={async () => {
+      {toast && <div className={'toast' + (/could not find|schema cache|não foi possível|erro|falha/i.test(toast) ? ' toast-error' : '')}><Check size={16} /><span>{toast}</span>{toastAction && <button type="button" disabled={toastActionBusy} onClick={async () => {
         if (!toastAction || toastActionBusy) return;
         setToastActionBusy(true);
         await toastAction();
@@ -747,6 +775,17 @@ export default function App() {
         setToastActionBusy(false);
       }}>{toastActionBusy ? 'Desfazendo…' : 'Desfazer'}</button>}</div>}
     </div>
+  );
+}
+
+function KataruMark({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <defs><linearGradient id="kataru-mark-gradient" x1="5" y1="5" x2="43" y2="43" gradientUnits="userSpaceOnUse"><stop stopColor="#B7A9FF"/><stop offset="1" stopColor="#7866F5"/></linearGradient></defs>
+      <rect x="4" y="4" width="40" height="40" rx="12" fill="url(#kataru-mark-gradient)"/>
+      <path d="M15 12V36M15 24L31 12M15 24L32 36" stroke="#171522" strokeWidth="4.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M34 7.5V14.5M30.5 11H37.5" stroke="#FFD36A" strokeWidth="2.4" strokeLinecap="round"/>
+    </svg>
   );
 }
 
@@ -765,8 +804,13 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
 
 function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd }) {
   const featured = watching[0] || null;
-  const episodesWatched = items.reduce((sum, anime) => sum + Number(anime.episode_current || 0), 0);
-  const nextEpisode = featured ? Number(featured.episode_current || 0) + 1 : 1;
+  const currentEpisode = Number(featured?.episode_current || 0);
+  const expectedTotal = featured ? totalEpisodes(featured) : null;
+  const available = featured ? Number(featured.episodes_available || 0) || null : null;
+  const nextEpisode = currentEpisode + 1;
+  const canMarkNext = Boolean(featured && (available ? currentEpisode < available : expectedTotal ? currentEpisode < expectedTotal : false));
+  const progressTotal = expectedTotal || available;
+  const progress = progressTotal ? Math.min(100, Math.round((currentEpisode / progressTotal) * 100)) : 0;
 
   return (
     <div className="home-page">
@@ -780,25 +824,23 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
           <div><strong>{counts.all}</strong><span>na biblioteca</span></div>
           <div><strong>{counts.watching || 0}</strong><span>em andamento</span></div>
           <div><strong>{counts.completed || 0}</strong><span>concluídos</span></div>
-          <div><strong>{episodesWatched.toLocaleString('pt-BR')}</strong><span>episódios vistos</span></div>
         </div>
       </div>
 
       {featured ? (
-        <section
-          className="continue-hero"
-          style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,17,23,.98) 0%, rgba(15,17,23,.83) 40%, rgba(15,17,23,.2) 100%), url("' + (featured.image_url || '') + '")' }}
-        >
+        <section className="continue-hero" style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,17,23,.98) 0%, rgba(15,17,23,.83) 40%, rgba(15,17,23,.2) 100%), url("' + (featured.image_url || '') + '")' }}>
           <div className="hero-copy">
             <span className="hero-kicker"><Zap size={13} fill="currentColor" /> CONTINUE DE ONDE PAROU</span>
             <h2>{displayTitle(featured)}</h2>
-            <p>{featured.title_english && featured.title_english !== featured.title ? featured.title_english + ' · ' : ''}{featured.episodes_total ? featured.episodes_total + ' episódios' : 'Série em andamento'}</p>
+            <p>{expectedTotal ? expectedTotal + ' episódios' : available ? available + ' episódios lançados até agora' : 'Série em andamento'}</p>
             <div className="hero-progress">
-              <div><span style={{ width: (totalEpisodes(featured) ? Math.min(100, (Number(featured.episode_current || 0) / totalEpisodes(featured)) * 100) : 0) + '%' }} /></div>
-              <small>EP. {featured.episode_current || 0}{totalEpisodes(featured) ? ' / ' + totalEpisodes(featured) : ''}</small>
+              <div><span style={{ width: progress + '%' }} /></div>
+              <small>{expectedTotal ? 'EP. ' + currentEpisode + ' / ' + expectedTotal : available ? 'EP. ' + currentEpisode + ' · ' + available + ' lançados' : 'EP. ' + currentEpisode}</small>
             </div>
             <div className="hero-actions">
-              <button className="primary-button" onClick={() => onQuickEpisode(featured)}><Check size={15} />Marcar ep. {nextEpisode} como visto</button>
+              {canMarkNext
+                ? <button className="primary-button" onClick={() => onQuickEpisode(featured)}><Check size={15} />Marcar ep. {nextEpisode} como visto</button>
+                : <span className="hero-up-to-date">{available && currentEpisode >= available ? 'Você está em dia com os episódios lançados.' : 'O catálogo ainda não confirmou o próximo episódio.'}</span>}
               <button className="hero-secondary" onClick={() => onOpenAnime(featured)}>Ver detalhes <ArrowRight size={15} /></button>
             </div>
           </div>
@@ -1132,22 +1174,31 @@ function StarRating({ value, onChange }) {
 function SearchModal({ query, setQuery, results, searching, error, onSearch, onClose, onAdd, onManual, isInCollection, allowExisting }) {
   const [formatFilter, setFormatFilter] = useState('all');
   const formatOptions = [
-    { id: 'all', label: 'Todos' },
-    { id: 'TV', label: 'Série (TV)' },
-    { id: 'Movie', label: 'Filme' },
-    { id: 'OVA', label: 'OVA' }
+    { id: 'all', label: 'Todos' }, { id: 'TV', label: 'Série (TV)' },
+    { id: 'Movie', label: 'Filme' }, { id: 'OVA', label: 'OVA' }
   ];
-  const filteredResults = results.filter(result => formatFilter === 'all' || result.format === formatFilter);
+  const normalizedQuery = query.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const filteredResults = results
+    .filter(result => formatFilter === 'all' || result.format === formatFilter)
+    .sort((a, b) => {
+      const aTitle = displayTitle(a).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const bTitle = displayTitle(b).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      return Number(bTitle.startsWith(normalizedQuery)) - Number(aTitle.startsWith(normalizedQuery));
+    });
 
   return (
     <div className="overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="modal search-modal">
         <div className="modal-header"><div><p className="eyebrow">ENCONTRE SEU PRÓXIMO ANIME</p><h2>Buscar no catálogo</h2></div><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={18} /></button></div>
-        <form className="catalog-search" onSubmit={onSearch}><Search size={19} /><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Digite o nome de um anime..." /><button className="primary-button" disabled={searching || !query.trim()}>{searching ? <LoaderCircle className="spin" size={16} /> : 'Buscar anime'}</button></form>
-        <p className="helper-text">Pesquise por título em português, inglês ou japonês romanizado.</p>
-        {error && <div className="error-panel"><span>{error}</span><button className="outline-button" onClick={onManual}>Adicionar manualmente</button></div>}
+        <form className="catalog-search" onSubmit={onSearch}>
+          <Search size={19} />
+          <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Digite pelo menos 2 letras do anime..." />
+          {searching && <LoaderCircle className="spin" size={17} />}
+        </form>
+        <p className="helper-text">Os resultados aparecem automaticamente enquanto você digita.</p>
+        {error && <div className="error-panel"><span>{error}</span><button type="button" className="outline-button" onClick={onManual}>Adicionar manualmente</button></div>}
         {results.length > 0 && <div className="search-format-tabs" role="group" aria-label="Filtrar formato">{formatOptions.map(option => <button type="button" key={option.id} className={formatFilter === option.id ? 'active' : ''} onClick={() => setFormatFilter(option.id)}>{option.label}</button>)}</div>}
-        {searching && <div className="loading-block compact-loading"><LoaderCircle className="spin" />Buscando resultados...</div>}
+        {searching && !results.length && <div className="loading-block compact-loading"><LoaderCircle className="spin" />Buscando “{query.trim()}”...</div>}
         {filteredResults.length > 0 && <div className="results-list">{filteredResults.map(result => {
           const exists = isInCollection(result);
           const canAddToList = exists && allowExisting;
@@ -1157,9 +1208,9 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
             <button className={exists && !canAddToList ? 'outline-button result-added' : 'outline-button'} disabled={exists && !canAddToList} onClick={() => onAdd(result)}>{canAddToList ? <><Plus size={14} />Adicionar à lista</> : exists ? <><Check size={14} />Na biblioteca</> : <><Plus size={14} />Adicionar</>}</button>
           </article>;
         })}</div>}
-        {!searching && !error && !results.length && <div className="search-empty"><Search size={25} /><p>{query.trim() ? 'Nenhum anime encontrado para esta pesquisa.' : 'Digite um título para começar a busca.'}</p><button className="text-link" onClick={onManual}>{query.trim() ? 'Não encontrou no catálogo? Adicionar manualmente' : 'Adicionar manualmente'} <ArrowRight size={13} /></button></div>}
+        {!searching && !error && !results.length && <div className="search-empty"><Search size={25} /><p>{query.trim().length >= 2 ? 'Nenhum anime encontrado para esta pesquisa.' : 'Comece digitando o nome de um anime.'}</p><button className="text-link" type="button" onClick={onManual}>{query.trim().length >= 2 ? 'Não encontrou no catálogo? Adicionar manualmente' : 'Adicionar manualmente'} <ArrowRight size={13} /></button></div>}
         {!searching && results.length > 0 && !filteredResults.length && <div className="search-filter-empty"><p>Nenhum título neste formato. Escolha outra categoria.</p></div>}
-        {results.length > 0 && <button className="manual-add-link" onClick={onManual}><Plus size={14} />Adicionar manualmente</button>}
+        {results.length > 0 && <button className="manual-add-link" type="button" onClick={onManual}><Plus size={14} />Adicionar manualmente</button>}
       </section>
     </div>
   );
@@ -1174,33 +1225,31 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
     form.status !== (anime.status || 'planned') ||
     String(form.episode_current ?? 0) !== String(anime.episode_current ?? 0) ||
     String(form.rating_personal ?? '') !== String(anime.rating_personal ?? '') ||
-    String(form.notes || '') !== String(anime.notes || '') ||
-    String(form.display_title || '') !== String(anime.display_title || '') ||
-    String(form.episodes_total_manual ?? '') !== String(anime.episodes_total_manual ?? '') ||
-    String(form.episodes_total_mode || 'unknown') !== (anime.episodes_total_manual ? 'manual' : anime.episodes_total ? 'catalog' : 'unknown') ||
     String(form.rewatch_count ?? 0) !== String(anime.rewatch_count ?? 0) ||
     String(form.started_at || '') !== String(anime.started_at || '') ||
     String(form.completed_at || '') !== String(anime.completed_at || '') ||
-    String(form.format || '') !== String(anime.format || '') ||
     String(form.title || '') !== String(anime.title || '') ||
     Boolean(form.is_manual) !== Boolean(anime.is_manual)
   ));
-  const nextEpisode = Number(form.episode_current || 0);
-  const catalogTotal = Number(anime.episodes_total || 0);
-  const manualTotal = Number(form.episodes_total_manual || 0);
-  const total = form.episodes_total_mode === 'manual' ? manualTotal : form.episodes_total_mode === 'unknown' ? 0 : catalogTotal;
-  const showProgress = form.status !== 'planned';
-  const setStatus = status => setForm(current => ({
-    ...current,
-    status,
-    episode_current: status === 'completed' && total ? total : current.episode_current,
-    started_at: status === 'watching' && !current.started_at ? today : current.started_at,
-    completed_at: status === 'completed' && !current.completed_at ? today : current.completed_at
-  }));
-  const dateShortcuts = (key, value) => <div className="date-shortcuts">
+  const total = totalEpisodes(anime);
+  const available = Number(anime.episodes_available || 0) || null;
+  const maxEpisode = total || available || undefined;
+  const episode = Number(form.episode_current || 0);
+  const needsEpisode = ['watching', 'paused', 'dropped'].includes(form.status);
+  const showRating = form.status !== 'planned';
+  const dateShortcuts = key => <div className="date-shortcuts">
     <button type="button" onClick={() => update(key, today)}>Hoje</button>
     <button type="button" onClick={() => update(key, '')}>Não lembro</button>
   </div>;
+  const setStatus = status => setForm(current => ({
+    ...current,
+    status,
+    episode_current: status === 'planned' ? 0
+      : status === 'completed' ? (total || available || Number(current.episode_current || 0))
+      : current.episode_current,
+    started_at: status === 'watching' && !current.started_at ? today : current.started_at,
+    completed_at: status === 'completed' && !current.completed_at ? today : current.completed_at
+  }));
 
   return (
     <div className="overlay editor-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
@@ -1209,45 +1258,39 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
         {isDirty && <div className="editor-unsaved-banner"><span>Você tem alterações não salvas.</span><button type="button" onClick={onClose}>Descartar alterações</button></div>}
         <div className="editor-anime-preview">
           {anime.image_url ? <img src={anime.image_url} alt="" /> : <div className="editor-cover-fallback"><Clapperboard size={24} /></div>}
-          <div><strong>{anime.title || 'Novo anime'}</strong><span>{anime.year || 'Ano não informado'} · {catalogTotal || manualTotal || 'Total não informado'} episódios</span><small>{(anime.genres || []).slice(0, 3).join(' · ')}</small></div>
+          <div><strong>{anime.title || 'Novo anime'}</strong><span>{anime.year || 'Ano não informado'} · {total ? total + ' episódios' : available ? available + ' lançados até agora' : 'Total ainda não informado'}</span><small>{(anime.genres || []).slice(0, 3).join(' · ')}</small></div>
           <span className="editor-step">2/2</span>
         </div>
         {form.is_manual && <label className="field full"><span>Título do anime</span><input required value={form.title} onChange={event => update('title', event.target.value)} placeholder="Nome do anime" /></label>}
         <div className="editor-section">
           <span className="field-label">Status</span>
           <div className="status-segment editor-status">{STATUSES.map(status => <button type="button" key={status.id} className={form.status === status.id ? 'selected tone-' + status.tone : ''} onClick={() => setStatus(status.id)}>{status.label}</button>)}</div>
-          {form.status === 'planned' && <p className="status-guidance">Pronto! O anime será salvo em “Quero assistir”. Você pode preencher o restante quando começar a assistir.</p>}
-          {form.status === 'watching' && <p className="status-guidance">Marque quantos episódios você já assistiu e registre quando começou.</p>}
-          {form.status === 'completed' && <p className="status-guidance">Registre os episódios concluídos e, se lembrar, a data em que terminou.</p>}
-          {(form.status === 'paused' || form.status === 'dropped') && <p className="status-guidance">Informe até onde você assistiu. Essas informações podem ser ajustadas depois.</p>}
+          {form.status === 'planned' && <p className="status-guidance">O anime será salvo em “Quero assistir”. Não é necessário preencher progresso ou datas.</p>}
+          {form.status === 'watching' && <p className="status-guidance">Informe o episódio em que você está. A data de início é opcional.</p>}
+          {form.status === 'completed' && <p className="status-guidance">Ao salvar como Assistido, o Kataru considera a obra concluída. Não precisa informar o número de episódios.</p>}
+          {form.status === 'paused' && <p className="status-guidance">Informe o episódio em que você pausou.</p>}
+          {form.status === 'dropped' && <p className="status-guidance">Informe o episódio em que você parou de assistir.</p>}
         </div>
-        {showProgress && <>
-          <div className="editor-grid progress-editor-grid">
-            <label className="field"><span>{form.status === 'completed' ? 'Episódios assistidos' : 'Episódio atual'}</span><div className="number-stepper"><button type="button" onClick={() => update('episode_current', Math.max(0, nextEpisode - 1))}>−</button><input type="number" min="0" max={total || undefined} value={form.episode_current} onChange={event => update('episode_current', event.target.value)} /><button type="button" onClick={() => update('episode_current', Math.min(total || 99999, nextEpisode + 1))}>+</button></div><small>{total ? 'de ' + total.toLocaleString('pt-BR') + ' episódios' : 'Total ainda não informado'}</small></label>
-            {total > 0 && <div className="field episode-quick-actions"><span>Preenchimento rápido</span><div className="quick-action-buttons"><button type="button" onClick={() => update('episode_current', 0)}>Comecei no ep. 1</button>{catalogTotal > 0 && <button type="button" onClick={() => update('episode_current', catalogTotal)}>Até o último episódio disponível</button>}</div></div>}
-          </div>
-          {total > 0 && nextEpisode >= total && form.status === 'watching' && <p className="progress-complete-hint"><Check size={13} />Você chegou ao total informado. Considere mudar o status para Assistido.</p>}
-          <div className="field total-mode-field">
-            <span>Total de episódios</span>
-            <div className="total-mode-options">
-              <button type="button" className={form.episodes_total_mode === 'catalog' ? 'active' : ''} onClick={() => update('episodes_total_mode', 'catalog')} disabled={!catalogTotal}>Do catálogo{catalogTotal ? ' · ' + catalogTotal : ''}</button>
-              <button type="button" className={form.episodes_total_mode === 'unknown' ? 'active' : ''} onClick={() => update('episodes_total_mode', 'unknown')}>Não sei</button>
-              <button type="button" className={form.episodes_total_mode === 'manual' ? 'active' : ''} onClick={() => update('episodes_total_mode', 'manual')}>Informar manualmente</button>
+        {needsEpisode && (
+          <label className="field episode-current-field">
+            <span>{form.status === 'dropped' ? 'Episódio em que parou' : form.status === 'paused' ? 'Episódio em que pausou' : 'Episódio atual'}</span>
+            <div className="number-stepper">
+              <button type="button" onClick={() => update('episode_current', Math.max(0, episode - 1))} disabled={!episode}>−</button>
+              <input type="number" min="0" max={maxEpisode} value={form.episode_current} onChange={event => update('episode_current', Math.max(0, Math.min(maxEpisode || 999999, Number(event.target.value || 0))))} />
+              <button type="button" onClick={() => update('episode_current', Math.min(maxEpisode || 999999, episode + 1))} disabled={Boolean(maxEpisode && episode >= maxEpisode)}>+</button>
             </div>
-            {form.episodes_total_mode === 'manual' && <input className="total-manual-input" type="number" min="1" value={form.episodes_total_manual} onChange={event => update('episodes_total_manual', event.target.value)} placeholder="Digite o total de episódios" />}
-            {form.episodes_total_mode === 'unknown' && <small>Você poderá informar o total mais tarde.</small>}
-          </div>
-        </>}
-        {(form.status === 'watching' || form.status === 'paused' || form.status === 'dropped') && <label className="field date-field"><span>Data de início</span><input type="date" value={form.started_at} onChange={event => update('started_at', event.target.value)} />{dateShortcuts('started_at')}</label>}
-        {form.status === 'completed' && <label className="field date-field"><span>Data de término</span><input type="date" value={form.completed_at} onChange={event => update('completed_at', event.target.value)} />{dateShortcuts('completed_at')}</label>}
-        <div className="editor-grid secondary-editor-grid">
-          <label className="field"><span>Vezes que reassistiu</span><input type="number" min="0" value={form.rewatch_count} onChange={event => update('rewatch_count', event.target.value)} /></label>
-          <label className="field"><span>Formato</span><select value={form.format} onChange={event => update('format', event.target.value)}><option value="">Não informado</option>{['TV', 'Movie', 'OVA', 'ONA', 'Special', 'Music'].map(value => <option key={value} value={value}>{value === 'Movie' ? 'Filme' : value}</option>)}</select></label>
-          <label className="field full"><span>Título exibido (opcional)</span><input value={form.display_title} onChange={event => update('display_title', event.target.value)} placeholder={anime.title || 'Nome que aparecerá na biblioteca'} /></label>
-        </div>
-        <div className="editor-section rating-editor"><div><span className="field-label">Sua nota</span><small>Uma avaliação pessoal de 1 a 5 estrelas.</small></div><StarRating value={form.rating_personal ? Math.round(Number(form.rating_personal) / 2) : 0} onChange={stars => update('rating_personal', stars ? stars * 2 : '')} /></div>
-        <label className="field notes-field"><span>Anotações</span><textarea rows="3" value={form.notes} onChange={event => update('notes', event.target.value)} placeholder="Guarde suas impressões, momentos favoritos ou onde parou..." /></label>
-        {!form.is_manual && <div className="editor-catalog-actions"><p className="editor-catalog-note">Título original, pôster e sinopse vêm do catálogo e não são editáveis.</p><button type="button" className="text-button" onClick={async () => { const restored = await onRestoreCatalog(); if (restored) setCatalogRestored(true); }}>Restaurar dados do catálogo</button></div>}
+            <small>{total ? 'de ' + total + ' episódios' : available ? 'Até o episódio ' + available + ' lançado' : 'Informe o episódio assistido'}</small>
+          </label>
+        )}
+        {form.status === 'watching' && <label className="field date-field"><span>Data de início (opcional)</span><input type="date" value={form.started_at} onChange={event => update('started_at', event.target.value)} />{dateShortcuts('started_at')}</label>}
+        {form.status === 'completed' && (
+          <>
+            <label className="field date-field"><span>Data de término</span><input type="date" value={form.completed_at} onChange={event => update('completed_at', event.target.value)} />{dateShortcuts('completed_at')}</label>
+            <label className="field rewatch-field"><span>Quantas vezes reassistiu?</span><input type="number" min="0" value={form.rewatch_count} onChange={event => update('rewatch_count', Math.max(0, Number(event.target.value || 0)))} /></label>
+          </>
+        )}
+        {showRating && <div className="editor-section rating-editor"><div><span className="field-label">Sua nota (opcional)</span><small>Avalie de 1 a 5 estrelas.</small></div><StarRating value={form.rating_personal ? Math.round(Number(form.rating_personal) / 2) : 0} onChange={stars => update('rating_personal', stars ? stars * 2 : '')} /></div>}
+        {!form.is_manual && <div className="editor-catalog-actions"><p className="editor-catalog-note">Os dados básicos são obtidos automaticamente do catálogo.</p><button type="button" className="text-button" onClick={async () => { const restored = await onRestoreCatalog(); if (restored) setCatalogRestored(true); }}>Atualizar dados do catálogo</button></div>}
         <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancelar</button><button className="primary-button" disabled={saving}>{saving ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{isNew ? 'Adicionar à biblioteca' : 'Salvar alterações'}</button></div>
       </form>
     </div>
@@ -1260,9 +1303,8 @@ function ListEditorModal({ list, form, setForm, saving, onSubmit, onClose }) {
       <form className="modal list-editor-modal" onSubmit={onSubmit}>
         <div className="modal-header"><div><p className="eyebrow">ORGANIZE DO SEU JEITO</p><h2>{list ? 'Editar lista' : 'Nova lista'}</h2></div><button type="button" className="icon-button" onClick={onClose}><X size={18} /></button></div>
         <label className="field"><span>Nome</span><input autoFocus required maxLength="60" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} placeholder="Ex.: Favoritos de todos os tempos" /></label>
-        <label className="field list-description-field"><span>Descrição</span><textarea rows="3" maxLength="220" value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} placeholder="Sobre o que é esta lista?" /></label>
-        <label className="visibility-toggle"><input type="checkbox" checked={form.is_public} onChange={event => setForm({ ...form, is_public: event.target.checked })} /><span><strong>Lista pública</strong><small>A preferência fica salva, mas o compartilhamento ainda não está ativo.</small></span><i>{form.is_public ? 'Pública' : 'Privada'}</i></label>
-        <label className="visibility-toggle ranked-toggle"><input type="checkbox" checked={Boolean(form.is_ranked)} onChange={event => setForm({ ...form, is_ranked: event.target.checked })} /><span><strong>Lista ranqueada</strong><small>Mostra posições e permite reordenar os animes por preferência.</small></span><i>{form.is_ranked ? 'Ranking' : 'Livre'}</i></label>
+        <label className="field list-description-field"><span>Descrição (opcional)</span><textarea rows="3" maxLength="220" value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} placeholder="Sobre o que é esta lista?" /></label>
+        <label className="visibility-toggle ranked-toggle"><input type="checkbox" checked={Boolean(form.is_ranked)} onChange={event => setForm({ ...form, is_ranked: event.target.checked })} /><span><strong>Ordenar por preferência</strong><small>Cria um ranking: 1º lugar, 2º lugar, 3º lugar. Depois você pode mover os animes para cima ou para baixo.</small></span><i>{form.is_ranked ? 'Ativado' : 'Livre'}</i></label>
         <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancelar</button><button className="primary-button" disabled={saving || !form.name.trim()}>{saving ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{list ? 'Salvar alterações' : 'Criar lista'}</button></div>
       </form>
     </div>

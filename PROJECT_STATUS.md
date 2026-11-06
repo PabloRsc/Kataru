@@ -50,7 +50,7 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 - src/App.jsx — interface principal.
 - src/AuthGate.jsx — autenticação e controle de sessão.
 - src/storage.js — persistência local/Supabase.
-- src/api.js — Jikan API.
+- src/api.js — cliente da API própria de catálogo.\n- api/anime/ — endpoints serverless de pesquisa e detalhes.\n- server/jikan.js — integração server-side com Jikan, timeout e retry.\n- vite.config.js — proxy local das rotas de catálogo.
 - src/styles.css — interface.
 - supabase/schema.sql — banco e RLS.
 

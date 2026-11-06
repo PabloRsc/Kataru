@@ -727,3 +727,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .search-format-tabs button { flex: 1; padding-inline: 5px; font-size: 8px; }
   .editor-unsaved-banner { align-items: flex-start; flex-direction: column; gap: 5px; }
 }
+
+
+/* Ações nos novos estados de edição e progresso */
+.toast { gap: 10px; }
+.toast span { min-width: 0; }
+.toast button { flex: 0 0 auto; padding: 4px 8px; color: #F3E8FF; background: #FFFFFF12; border: 1px solid #FFFFFF38; border-radius: 5px; font-size: 9px; font-weight: 750; }
+.toast button:hover { background: #FFFFFF22; }
+.editor-catalog-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.editor-catalog-actions .editor-catalog-note { margin: 0; }
+.editor-catalog-actions .text-button { color: #C9C1FF; font-weight: 700; }
+@media (max-width: 600px) {
+  .editor-catalog-actions { align-items: flex-start; flex-direction: column; }
+  .toast { max-width: calc(100vw - 24px); }
+}

@@ -65,6 +65,7 @@ export function normalizeAnime(a = {}) {
     year: a.year || a.aired?.prop?.from?.year || a.year_season || null,
     season: a.season || null,
     genres: (a.genres || []).map(g => typeof g === 'string' ? g : g.name).filter(Boolean),
+    studios: (a.studios || []).map(studio => typeof studio === 'string' ? studio : studio.name).filter(Boolean),
     score_external: a.score || null,
     format: a.type || '',
     api_synced_at: new Date().toISOString()

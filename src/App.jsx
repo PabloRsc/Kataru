@@ -371,9 +371,10 @@ export default function App() {
       setForm(current => ({
         ...current,
         format: fresh.format || current.format,
-        episodes_total_mode: current.episodes_total_mode === 'manual'
-          ? 'manual'
-          : fresh.episodes_total ? 'catalog' : 'unknown'
+        title: fresh.title || current.title,
+        display_title: '',
+        episodes_total_manual: '',
+        episodes_total_mode: fresh.episodes_total ? 'catalog' : 'unknown'
       }));
       notify('Dados do catálogo recarregados. Salve as alterações para aplicar.');
       return true;

@@ -675,3 +675,55 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .discover-tab { padding-inline: 5px; }
   .status-tabs { gap: 15px; }
 }
+
+
+/* Refinamentos de fidelidade aos fluxos dos mockups */
+.home-summary { flex-wrap: wrap; }
+.search-format-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 8px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.search-format-tabs button { min-height: 29px; padding: 0 11px; color: var(--muted); background: var(--panel-soft); border: 1px solid var(--line); border-radius: 6px; font-size: 9px; }
+.search-format-tabs button.active { color: #E8E2FF; background: #8B7CFF22; border-color: #8B7CFF75; font-weight: 700; }
+.search-filter-empty { padding: 20px 8px; color: var(--muted-2); text-align: center; font-size: 9px; }
+.personalized-section { padding: 18px; margin: 0 0 28px; background: linear-gradient(120deg, #25233B66, #1B1E2933); border: 1px solid #514A713D; border-radius: 11px; }
+.personalized-section .section-heading { margin-bottom: 14px; }
+.personalized-label { display: inline-flex; align-items: center; gap: 5px; color: #C7BDFF; font-size: 8px; font-weight: 800; letter-spacing: .6px; white-space: nowrap; }
+.personalized-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.list-item-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ranked-list-item { position: relative; padding-top: 22px; }
+.rank-number { position: absolute; z-index: 2; top: 0; left: 0; display: grid; place-items: center; min-width: 24px; height: 20px; padding: 0 5px; color: #211B34; background: var(--yellow); border-radius: 5px; font: 800 9px 'Outfit', sans-serif; }
+.ranked-order-controls { display: inline-flex; gap: 4px; margin-top: 7px; }
+.ranked-order-controls button { display: grid; place-items: center; width: 24px; height: 23px; color: var(--muted); background: var(--panel-soft); border: 1px solid var(--line); border-radius: 5px; }
+.ranked-order-controls button:hover:not(:disabled) { color: var(--purple); border-color: var(--purple); }
+.ranked-order-controls button:disabled { opacity: .28; }
+.status-guidance { margin: 9px 0 0; color: var(--muted-2); font-size: 8px; line-height: 1.55; }
+.progress-editor-grid { margin-bottom: 14px; }
+.episode-quick-actions { align-self: end; }
+.quick-action-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick-action-buttons button, .date-shortcuts button { min-height: 28px; padding: 0 8px; color: #C6BEF5; background: #8B7CFF16; border: 1px solid #8B7CFF40; border-radius: 5px; font-size: 8px; }
+.total-mode-field { margin: 14px 0; }
+.total-mode-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.total-mode-options button { min-height: 33px; padding: 0 10px; color: var(--muted); background: #141720; border: 1px solid #3B4051; border-radius: 6px; font-size: 8px; }
+.total-mode-options button.active { color: #D9D1FF; background: #8B7CFF1F; border-color: #8B7CFF75; font-weight: 700; }
+.total-mode-options button:disabled { opacity: .4; }
+.total-manual-input { margin-top: 8px; }
+.date-field { margin: 14px 0; }
+.date-shortcuts { display: flex; gap: 6px; }
+.editor-unsaved-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -5px 0 15px; padding: 10px 12px; color: #F5DCA7; background: #5B45201F; border: 1px solid #8A6D3A66; border-radius: 7px; font-size: 9px; }
+.editor-unsaved-banner button { padding: 3px 0; color: #D2C3FF; background: none; border: 0; font-size: 8px; font-weight: 700; }
+.detail-studio { margin: -4px 0 13px; color: var(--muted-2); font-size: 9px; }
+.progress-complete-hint { display: flex; align-items: center; gap: 5px; margin: 11px 0 0; color: var(--green); font-size: 8px; }
+.visibility-toggle.ranked-toggle { margin-top: 9px; }
+@media (max-width: 780px) {
+  .personalized-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .personalized-section { padding: 12px; }
+  .personalized-grid { grid-template-columns: 1fr; }
+  .ranked-list-item { padding-top: 19px; }
+  .list-item-actions { align-items: flex-start; flex-direction: column; gap: 1px; }
+  .total-mode-options { display: grid; grid-template-columns: 1fr; }
+  .episode-quick-actions { grid-column: 1 / -1; }
+  .date-shortcuts { margin-top: 2px; }
+  .search-format-tabs { gap: 4px; }
+  .search-format-tabs button { flex: 1; padding-inline: 5px; font-size: 8px; }
+  .editor-unsaved-banner { align-items: flex-start; flex-direction: column; gap: 5px; }
+}

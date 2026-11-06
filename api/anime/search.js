@@ -21,9 +21,29 @@ export default async function handler(req, res) {
 
   try {
     const result = await requestJikan('/anime?' + params.toString());
+    let catalog = result.data;
+    // Jikan reports the total as null for many currently-airing long runners.
+    // Enrich those entries with AniList's current airing schedule when available.
+    if (catalog.data?.some(item => item.episodes == null)) {
+      try {
+        const alternate = await searchAniList(query);
+        const byMalId = new Map(alternate.map(item => [item.idMal, toJikanShape(item)]));
+        catalog = {
+          ...catalog,
+          data: catalog.data.map(item => {
+            const extra = byMalId.get(item.mal_id);
+            return item.episodes == null && extra?.episodes != null
+              ? { ...item, episodes: extra.episodes }
+              : item;
+          })
+        };
+      } catch {
+        // Keep the primary catalog results even if optional enrichment is unavailable.
+      }
+    }
     res.setHeader('X-Kataru-Catalog-Source', 'jikan');
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
-    return res.status(200).json(result.data);
+    return res.status(200).json(catalog);
   } catch (jikanError) {
     try {
       const media = await searchAniList(query);

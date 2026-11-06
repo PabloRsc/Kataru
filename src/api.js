@@ -1,23 +1,46 @@
-const BASE = 'https://api.jikan.moe/v4';
-const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-let lastRequest = 0;
+const BASE = '/api/anime';
 
 async function request(path) {
-  const elapsed = Date.now() - lastRequest;
-  if (elapsed < 900) await wait(900 - elapsed);
-  lastRequest = Date.now();
-  const response = await fetch(`${BASE}${path}`);
-  if (!response.ok) throw new Error(response.status === 429 ? 'Muitas pesquisas em sequência. Aguarde alguns segundos e tente novamente.' : `Não foi possível consultar a Jikan (${response.status}).`);
-  return response.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 22000);
+
+  try {
+    const response = await fetch(`${BASE}${path}`, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' }
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        payload.message ||
+        (response.status === 504
+          ? 'O catálogo demorou demais para responder. Tente novamente.'
+          : 'Não foi possível consultar o catálogo de animes agora.')
+      );
+    }
+
+    return payload;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('A pesquisa demorou demais. Tente novamente em instantes.');
+    }
+    if (error instanceof TypeError) {
+      throw new Error('Não foi possível acessar o serviço de pesquisa. Verifique sua conexão e tente novamente.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function searchAnime(query) {
-  const data = await request(`/anime?q=${encodeURIComponent(query)}&limit=8&sfw=true&order_by=popularity&sort=asc`);
+  const data = await request(`/search?q=${encodeURIComponent(query)}`);
   return (data.data || []).map(normalizeAnime);
 }
 
 export async function fetchAnime(malId) {
-  const data = await request(`/anime/${malId}/full`);
+  const data = await request(`/${encodeURIComponent(malId)}`);
   return normalizeAnime(data.data);
 }
 

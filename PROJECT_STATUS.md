@@ -9,7 +9,7 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 ## Implementado no repositório
 
 - Aplicação React + Vite.
-- Pesquisa de catálogo via funções serverless da Vercel, com timeout, retry e cache; Jikan permanece como fonte externa.
+- Pesquisa de catálogo via funções serverless da Vercel, com timeout, retry e cache; Jikan como fonte principal e AniList como fallback, com normalização por ID MAL.
 - Cadastro, edição, exclusão, filtros e detalhes da coleção.
 - Persistência local via localStorage quando o Supabase não está configurado.
 - Cliente Supabase com sessão persistente.
@@ -36,7 +36,7 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 
 ## Pendências prioritárias
 
-1. Confirmar deploy da nova API de catálogo na Vercel e testar `/api/anime/search?q=one%20piece`.
+1. Confirmar deploy da API de catálogo com fallback AniList na Vercel e testar `/api/anime/search?q=one%20piece`.
 2. Executar npm install e npm run build.
 3. Testar fluxos de autenticação e políticas RLS com duas contas reais.
 4. Completar/verificar o fluxo de redefinição de senha após retorno do e-mail.
@@ -51,6 +51,9 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 - src/AuthGate.jsx — autenticação e controle de sessão.
 - src/storage.js — persistência local/Supabase.
 - src/api.js — cliente da API própria de catálogo.
+- api/anime/ — endpoints serverless de pesquisa e detalhes.
+- server/jikan.js — Jikan com timeout e retry.
+- server/anilist.js — fallback AniList e normalização.
 - api/anime/ — endpoints serverless de pesquisa e detalhes.
 - server/jikan.js — integração server-side com Jikan, timeout e retry.
 - vite.config.js — proxy local das rotas de catálogo.

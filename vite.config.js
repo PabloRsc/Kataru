@@ -6,12 +6,14 @@ export default defineConfig({
   server: {
     proxy: {
       '/api/anime': {
-        target: 'https://api.jikan.moe/v4',
+        target: 'https://api.jikan.moe',
         changeOrigin: true,
         secure: true,
-        rewrite: path => path
-          .replace(/^\\/api\\/anime\\/search/, '/anime')
-          .replace(/^\\/api\\/anime\\/(\\d+)$/, '/anime/$1/full')
+        rewrite: path => {
+          if (path === '/api/anime/search') return '/v4/anime';
+          const match = path.match(/^\/api\/anime\/([0-9]+)$/);
+          return match ? \`/v4/anime/\${match[1]}/full\` : path;
+        }
       }
     }
   }

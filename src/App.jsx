@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, Clapperboard, X, ChevronLeft, Star, Pencil, Trash2, LoaderCircle, Library, SlidersHorizontal, Check, ExternalLink } from 'lucide-react';
+import { Search, Plus, Clapperboard, X, ChevronLeft, Star, Pencil, Trash2, LoaderCircle, Library, SlidersHorizontal, Check, ExternalLink, LogOut } from 'lucide-react';
 import { searchAnime, fetchAnime } from './api';
-import { getAnimeList, saveAnime, deleteAnime, storageMode } from './storage';
+import { getAnimeList, saveAnime, deleteAnime, storageMode, supabase } from './storage';
 
 const STATUSES = [
   { id: 'watching', label: 'Assistindo' },
@@ -80,7 +80,7 @@ export default function App() {
   return <div className="app-shell">
     <header className="topbar"><a className="brand" href="#top" onClick={() => { setSelected(null); setFilter('all'); }}><span className="brand-mark"><Clapperboard size={19}/></span><span>animelog</span></a>
       <nav className="top-nav"><button className="nav-link active" onClick={() => { setSelected(null); setFilter('all'); }}>Minha coleção</button><button className="nav-link" onClick={() => setSearchOpen(true)}>Adicionar anime</button></nav>
-      <button className="add-button" onClick={() => setSearchOpen(true)}><Plus size={17}/><span>Adicionar</span></button>
+      <div className="topbar-actions"><button className="add-button" onClick={() => setSearchOpen(true)}><Plus size={17}/><span>Adicionar</span></button>{storageMode === "supabase" && <button className="signout-button" title="Sair da conta" aria-label="Sair da conta" onClick={async () => { await supabase.auth.signOut(); }}><LogOut size={16}/></button>}</div>
     </header>
 
     <main className="main-content" id="top">

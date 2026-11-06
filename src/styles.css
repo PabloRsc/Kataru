@@ -43,7 +43,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   backdrop-filter: blur(18px);
 }
 .brand { display: inline-flex; align-items: center; gap: 10px; min-width: 142px; padding: 0; border: 0; background: none; color: var(--text); }
-.brand-mark { width: 34px; height: 34px; display: grid; place-items: center; color: #0F1117; background: var(--yellow); border-radius: 10px; }
+.brand-mark { width: 40px; height: 40px; display: grid; place-items: center; color: #0F1117; background: transparent; border-radius: 10px; }
 .brand-name { color: var(--text); font: 800 25px/1 'Outfit', sans-serif; letter-spacing: -.8px; }
 .brand-name span, .footer-brand span { color: var(--purple); }
 .main-nav { display: flex; align-items: stretch; gap: 29px; height: 100%; }
@@ -494,7 +494,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (max-width: 600px) {
   .app-shell { padding-bottom: 67px; }
   .topbar { height: 60px; flex-basis: 60px; padding: 0 17px; gap: 12px; }
-  .brand-mark { width: 31px; height: 31px; border-radius: 9px; }
+  .brand-mark { width: 35px; height: 35px; border-radius: 9px; }
   .brand-name { font-size: 21px; }
   .main-nav { display: none; }
   .topbar-actions { gap: 7px; }
@@ -741,3 +741,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .editor-catalog-actions { align-items: flex-start; flex-direction: column; }
   .toast { max-width: calc(100vw - 24px); }
 }
+
+
+/* Logo próprio do Kataru e indicadores simplificados */
+.brand-mark svg { display: block; width: 100%; height: 100%; }
+.episode-availability-note { margin: 11px 0 0; color: var(--muted-2); font-size: 8px; line-height: 1.5; }
+.hero-up-to-date { display: inline-flex; align-items: center; min-height: 36px; padding: 0 2px; color: #BEE8D1; font-size: 9px; font-weight: 650; }
+.toast-error { color: #FFE0E4; background: #592C37; border-color: #A35464; }
+.toast-error svg { color: #FFB8C3; }

@@ -125,7 +125,7 @@ export async function deleteAnimeList(id) {
 
 function toRow(anime, ownerId) {
   return {
-    id: String(anime.id || String(ownerId) + ':' + String(anime.mal_id)),
+    id: String(ownerId) + ':' + String(anime.mal_id),
     owner_id: ownerId,
     mal_id: Number(anime.mal_id),
     title: anime.title || 'Sem título',

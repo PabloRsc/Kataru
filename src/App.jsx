@@ -398,8 +398,6 @@ export default function App() {
         episode_current: current.episode_current,
         rating_personal: current.rating_personal,
         notes: current.notes,
-        display_title: current.display_title,
-        episodes_total_manual: current.episodes_total_manual,
         rewatch_count: current.rewatch_count,
         started_at: current.started_at,
         completed_at: current.completed_at,
@@ -407,11 +405,7 @@ export default function App() {
       } : current);
       setForm(current => ({
         ...current,
-        format: fresh.format || '',
-        title: fresh.title || current.title,
-        display_title: '',
-        episodes_total_manual: '',
-        episodes_total_mode: fresh.episodes_total ? 'catalog' : 'unknown'
+        title: fresh.title || current.title
       }));
       notify('Dados do catálogo recarregados. Salve as alterações para aplicar.');
       return true;
@@ -729,7 +723,7 @@ export default function App() {
           searching={searching}
           error={searchError}
           onSearch={doSearch}
-          onClose={() => { setSearchOpen(false); setPendingListId(null); }}
+          onClose={() => { setSearchOpen(false); setPendingListId(null); setSearchQuery(''); setResults([]); }}
           onAdd={result => {
             const existing = items.find(item => String(item.mal_id) === String(result.mal_id));
             if (pendingListId && existing) {
@@ -1067,7 +1061,7 @@ function ListsPage({ items, lists, counts, onOpenStatus, onOpenList, onNewList, 
           return <article className="custom-list-card" key={list.id}>
             <button className="custom-list-open" onClick={() => onOpenList(list)}>
               <div className="list-cover-stack">{covers.length ? covers.map((anime, index) => <img key={anime.id} style={{ left: (index * 35) + 'px', zIndex: 5 - index }} src={anime.image_url} alt="" />) : <span><ListPlus size={26} /></span>}</div>
-              <div className="custom-list-info"><strong>{list.name}</strong><small>{list.description || 'Sem descrição'}</small><span>{count} {count === 1 ? 'anime' : 'animes'} · {list.is_public ? 'Pública · não compartilhável' : 'Privada'}</span></div>
+              <div className="custom-list-info"><strong>{list.name}</strong><small>{list.description || 'Sem descrição'}</small><span>{count} {count === 1 ? 'anime' : 'animes'}{list.is_ranked ? ' · ordem de preferência' : ''}</span></div>
             </button>
             <button className="list-more" onClick={() => onEditList(list)} aria-label="Editar lista"><MoreHorizontal size={18} /></button>
           </article>;
@@ -1086,7 +1080,7 @@ function CustomListDetail({ list, items, onBack, onEdit, onDelete, onOpenAnime, 
       <button className="back-link" onClick={onBack}><ChevronLeft size={16} />Voltar para listas</button>
       <div className="custom-list-heading">
         <div className="list-heading-icon"><ListPlus size={28} /></div>
-        <div className="list-heading-copy"><p className="eyebrow">MINHA LISTA{list.is_ranked ? ' · RANQUEADA' : ''}</p><h1>{list.name}<span className="heading-dot">.</span></h1><p>{list.description || 'Uma coleção organizada do seu jeito.'}</p><span className="list-visibility">{list.is_public ? 'Pública · compartilhamento indisponível' : 'Privada'} · {entries.length} {entries.length === 1 ? 'anime' : 'animes'}{list.is_ranked ? ' · em ordem de preferência' : ''}</span></div>
+        <div className="list-heading-copy"><p className="eyebrow">MINHA LISTA{list.is_ranked ? ' · RANQUEADA' : ''}</p><h1>{list.name}<span className="heading-dot">.</span></h1><p>{list.description || 'Uma coleção organizada do seu jeito.'}</p><span className="list-visibility">{entries.length} {entries.length === 1 ? 'anime' : 'animes'}{list.is_ranked ? ' · ordem de preferência' : ''}</span></div>
         <div className="list-heading-actions"><button className="outline-button" onClick={onEdit}><Pencil size={14} />Editar</button><button className="icon-button danger" onClick={onDelete} aria-label="Excluir lista"><Trash2 size={16} /></button></div>
       </div>
       <div className="section-heading list-detail-subhead"><div><h2>Animes desta lista</h2><p>Os títulos continuam salvos na sua biblioteca.</p></div><button className="primary-button" onClick={onAdd}><Plus size={15} />Adicionar anime</button></div>
@@ -1107,8 +1101,11 @@ function CustomListDetail({ list, items, onBack, onEdit, onDelete, onOpenAnime, 
 
 function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChange, onStatusChange, onRatingChange, onAddToList }) {
   const total = totalEpisodes(anime);
+  const available = Number(anime.episodes_available || 0) || null;
+  const progressTotal = total || available;
   const current = Number(anime.episode_current || 0);
-  const progress = total ? Math.min(100, Math.round((current / total) * 100)) : 0;
+  const progress = progressTotal ? Math.min(100, Math.round((current / progressTotal) * 100)) : 0;
+  const canAdvance = Boolean(progressTotal && current < progressTotal);
   const ratingStars = anime.rating_personal ? Math.round(Number(anime.rating_personal) / 2) : 0;
 
   return (
@@ -1124,7 +1121,7 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
           <p className="eyebrow">DETALHES DO ANIME</p>
           <h1>{displayTitle(anime)}<span className="heading-dot">.</span></h1>
           {anime.title_english && anime.title_english !== anime.title && <p className="detail-original-title">{anime.title_english}</p>}
-          <div className="detail-meta"><span>{anime.year || 'Ano não informado'}</span><i>·</i><span>{anime.format || 'Anime'}</span>{total && <><i>·</i><span>{total} episódios</span></>}{anime.season && <><i>·</i><span>{anime.season}</span></>}</div>
+          <div className="detail-meta"><span>{anime.year || 'Ano não informado'}</span>{anime.season && <><i>·</i><span>{anime.season}</span></>}</div>
           {anime.studios?.length > 0 && <p className="detail-studio">Estúdio: {anime.studios.join(', ')}</p>}
           <div className="detail-tags">{(anime.genres || []).map(genre => <span key={genre}>{genre}</span>)}</div>
 
@@ -1134,26 +1131,32 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
           </div>
 
           <div className="detail-progress-card">
-            <div className="progress-card-top"><div><span className="eyebrow">SEU PROGRESSO</span><strong>{current}<small> / {total || '?'}</small></strong><span>episódios assistidos</span></div><div className="progress-ring" style={{ '--progress': progress + '%' }}><strong>{total ? progress : '—'}<small>{total ? '%' : ''}</small></strong></div></div>
+            <div className="progress-card-top">
+              <div><span className="eyebrow">SEU PROGRESSO</span><strong>{current}<small>{total ? ' / ' + total : available ? ' / ' + available + ' lançados' : ' episódios registrados'}</small></strong><span>episódios assistidos</span></div>
+              <div className="progress-ring" style={{ '--progress': progress + '%' }}><strong>{progressTotal ? progress : '—'}<small>{progressTotal ? '%' : ''}</small></strong></div>
+            </div>
             <div className="progress-track"><span style={{ width: progress + '%' }} /></div>
-            {total && current >= total && <p className="progress-complete-hint"><Check size={13} />Você chegou ao total de episódios. O status foi marcado como Assistido.</p>}
-            <div className="episode-controls"><span>Atualizar episódio</span><div><button className="episode-step" onClick={() => onEpisodeChange(-1)} disabled={!current}>− 1</button><strong>{current}</strong><button className="episode-step positive" onClick={() => onEpisodeChange(1)} disabled={Boolean(total && current >= total)}>+ 1 episódio</button></div></div>
+            {total && current >= total && <p className="progress-complete-hint"><Check size={13} />Você chegou ao total de episódios.</p>}
+            {available && !total && current >= available && <p className="progress-complete-hint"><Check size={13} />Você está em dia com os episódios lançados.</p>}
+            <div className="episode-controls">
+              <span>Atualizar episódio</span>
+              <div>
+                <button className="episode-step" onClick={() => onEpisodeChange(-1)} disabled={!current}>− 1</button>
+                <strong>{current}</strong>
+                <button className="episode-step positive" onClick={() => onEpisodeChange(1)} disabled={!canAdvance}>+ 1 episódio</button>
+              </div>
+            </div>
+            {!progressTotal && <p className="episode-availability-note">O catálogo ainda não informou quantos episódios estão disponíveis. Atualize os dados do anime para consultar o catálogo.</p>}
           </div>
 
           <div className="detail-rating-notes">
             <section className="rating-panel"><div className="detail-block-heading"><span>SUA NOTA</span><strong>{anime.rating_personal ? (Number(anime.rating_personal) / 2).toFixed(1) + ' / 5' : 'Ainda sem nota'}</strong></div><StarRating value={ratingStars} onChange={onRatingChange} /></section>
-            <section className="detail-notes-panel"><div className="detail-block-heading"><span>ANOTAÇÕES</span><button onClick={onEdit}><Pencil size={12} />Editar</button></div><p>{anime.notes || 'Guarde aqui suas impressões, momentos favoritos ou onde parou.'}</p></section>
           </div>
 
           <div className="detail-info-grid">
-            <div><span>NOTA GERAL</span><strong>{anime.score_external ? <><Star size={13} fill="currentColor" />{Number(anime.score_external).toFixed(1)}</> : '—'}</strong></div>
-            <div><span>FORMATO</span><strong>{anime.format || '—'}</strong></div>
             <div><span>TEMPORADA</span><strong>{anime.season || '—'}{anime.year ? ' ' + anime.year : ''}</strong></div>
-            <div><span>ADICIONADO EM</span><strong>{formatDate(anime.created_at)}</strong></div>
-            <div><span>INÍCIO</span><strong>{formatDate(anime.started_at)}</strong></div>
             <div><span>CONCLUSÃO</span><strong>{formatDate(anime.completed_at)}</strong></div>
-            <div><span>REASSISTIDAS</span><strong>{anime.rewatch_count || 0} vezes</strong></div>
-            <div><span>ORIGEM</span><strong>{anime.is_manual ? 'Manual' : 'Catálogo'}</strong></div>
+            {anime.status === 'completed' && <div><span>REASSISTIDAS</span><strong>{anime.rewatch_count || 0} vezes</strong></div>}
           </div>
           <div className="detail-list-action">
             <label><ListPlus size={15} />Adicionar a uma lista</label>
@@ -1168,7 +1171,7 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
 }
 
 function StarRating({ value, onChange }) {
-  return <div className="star-rating" role="group" aria-label="Sua nota de zero a cinco estrelas">{[1, 2, 3, 4, 5].map(star => <button key={star} className={star <= value ? 'filled' : ''} onClick={() => onChange(star === value ? 0 : star)} aria-label={star + ' estrelas'}><Star size={23} fill={star <= value ? 'currentColor' : 'none'} /></button>)}</div>;
+  return <div className="star-rating" role="group" aria-label="Sua nota de zero a cinco estrelas">{[1, 2, 3, 4, 5].map(star => <button type="button" key={star} className={star <= value ? 'filled' : ''} onClick={() => onChange(star === value ? 0 : star)} aria-label={star + ' estrelas'}><Star size={23} fill={star <= value ? 'currentColor' : 'none'} /></button>)}</div>;
 }
 
 function SearchModal({ query, setQuery, results, searching, error, onSearch, onClose, onAdd, onManual, isInCollection, allowExisting }) {

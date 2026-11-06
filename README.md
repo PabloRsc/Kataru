@@ -37,7 +37,7 @@ A tela de conta inclui cadastro, login, redefinição de senha e saída. Com Sup
 
 ## Catálogo
 
-A pesquisa e atualização manual passam por funções serverless da Vercel (`/api/anime`). A fonte principal é a Jikan API; se ela falhar, o servidor consulta a AniList GraphQL como alternativa. Os dois provedores são normalizados para o formato usado pelo app e a alternativa só retorna títulos que possuem ID do MyAnimeList, preservando a compatibilidade com a coleção atual. Há timeout, retry limitado na Jikan e cache HTTP (5 minutos para pesquisas e 1 hora para detalhes). No desenvolvimento local, o Vite encaminha `/api/anime` para a Jikan; a alternativa AniList é executada nas funções serverless da Vercel.
+A pesquisa e atualização manual passam por funções serverless da Vercel (`/api/anime`). A fonte principal é a Jikan API; se ela falhar, o servidor consulta a AniList GraphQL como alternativa. Os dois provedores são normalizados para o formato usado pelo app e a alternativa só retorna títulos que possuem ID do MyAnimeList, preservando a compatibilidade com a coleção atual. Quando a Jikan não informa episódios de séries em lançamento, o Kataru tenta enriquecer a contagem com o calendário da AniList. Há timeout, retry limitado na Jikan e cache HTTP (5 minutos para pesquisas e 1 hora para detalhes). No desenvolvimento local, o Vite encaminha `/api/anime` para a Jikan; a alternativa AniList é executada nas funções serverless da Vercel.
 
 ## Próximas melhorias
 

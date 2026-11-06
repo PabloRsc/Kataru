@@ -16,6 +16,7 @@ create table if not exists public.anime_collection (
   season text,
   format text,
   genres text[] not null default '{}',
+  studios text[] not null default '{}',
   score_external numeric,
   status text not null default 'planned'
     check (status in ('watching','completed','planned','paused','dropped')),
@@ -36,6 +37,7 @@ alter table public.anime_collection add column if not exists owner_id uuid refer
 alter table public.anime_collection add column if not exists display_title text;
 alter table public.anime_collection add column if not exists episodes_total_manual integer;
 alter table public.anime_collection add column if not exists format text;
+alter table public.anime_collection add column if not exists studios text[] not null default '{}';
 alter table public.anime_collection add column if not exists rewatch_count integer not null default 0;
 alter table public.anime_collection add column if not exists started_at date;
 alter table public.anime_collection add column if not exists completed_at date;
@@ -73,10 +75,12 @@ create table if not exists public.anime_lists (
   name text not null check (char_length(name) between 1 and 60),
   description text,
   is_public boolean not null default false,
+  is_ranked boolean not null default false,
   anime_ids text[] not null default '{}',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.anime_lists add column if not exists is_ranked boolean not null default false;
 
 create unique index if not exists anime_lists_owner_id_key
   on public.anime_lists(owner_id, id);

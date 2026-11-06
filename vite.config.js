@@ -11,8 +11,14 @@ export default defineConfig({
         secure: true,
         rewrite: path => {
           if (path === '/api/anime/search') return '/v4/anime';
-          const match = path.match(/^\\/api\\/anime\\/([0-9]+)$/);
-          return match ? '/v4/anime/' + match[1] + '/full' : path;
+          const prefix = '/api/anime/';
+          if (path.startsWith(prefix)) {
+            const id = path.slice(prefix.length);
+            if (id && [...id].every(char => char >= '0' && char <= '9')) {
+              return '/v4/anime/' + id + '/full';
+            }
+          }
+          return path;
         }
       }
     }

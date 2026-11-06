@@ -114,7 +114,7 @@ export default function App() {
       .finally(() => { if (mounted) setLoading(false); });
     getAnimeLists()
       .then(data => { if (mounted) setLists(data || []); })
-      .catch(() => { if (mounted) setLists([]); });
+      .catch(error => { if (mounted) { setLists([]); notify(error.message || 'Não foi possível carregar suas listas.'); } });
     return () => { mounted = false; };
   }, []);
 
@@ -304,7 +304,7 @@ export default function App() {
     const total = totalEpisodes(anime);
     if (total && next > total) return;
     let updated = { ...anime, episode_current: next };
-    if (total && next >= total) updated.status = 'completed';
+    if (total && next >= total) { updated.status = 'completed'; updated.completed_at = updated.completed_at || new Date().toISOString().slice(0, 10); }
     return persistAnime(updated, 'Progresso atualizado.');
   }
 

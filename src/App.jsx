@@ -78,7 +78,7 @@ export default function App() {
   const counts = { all: items.length, ...Object.fromEntries(STATUSES.map(s => [s.id, items.filter(a => a.status === s.id).length])) };
 
   return <div className="app-shell">
-    <header className="topbar"><a className="brand" href="#top" onClick={() => { setSelected(null); setFilter('all'); }}><span className="brand-mark"><Clapperboard size={19}/></span><span>animelog</span></a>
+    <header className="topbar"><a className="brand" href="#top" onClick={() => { setSelected(null); setFilter('all'); }}><span className="brand-mark"><Clapperboard size={19}/></span><span>Kataru</span></a>
       <nav className="top-nav"><button className="nav-link active" onClick={() => { setSelected(null); setFilter('all'); }}>Minha coleção</button><button className="nav-link" onClick={() => setSearchOpen(true)}>Adicionar anime</button></nav>
       <div className="topbar-actions"><button className="add-button" onClick={() => setSearchOpen(true)}><Plus size={17}/><span>Adicionar</span></button>{storageMode === "supabase" && <button className="signout-button" title="Sair da conta" aria-label="Sair da conta" onClick={async () => { await supabase.auth.signOut(); }}><LogOut size={16}/></button>}</div>
     </header>
@@ -90,7 +90,7 @@ export default function App() {
         {loading ? <div className="empty-state"><LoaderCircle className="spin"/><p>Carregando sua coleção...</p></div> : visible.length ? <section className="poster-grid">{visible.map(anime => <Poster key={anime.id} anime={anime} onClick={() => setSelected(anime)}/>)}</section> : <div className="empty-state"><div className="empty-icon"><Library size={25}/></div><h2>{query ? 'Nenhum resultado encontrado' : filter === 'all' ? 'Sua coleção começa aqui' : 'Nada por aqui ainda'}</h2><p>{query ? 'Tente outro título ou limpe a busca.' : 'Pesquise um anime e adicione-o à sua biblioteca.'}</p>{!query && <button className="primary-button" onClick={() => setSearchOpen(true)}><Plus size={16}/> Adicionar primeiro anime</button>}</div>}
       </>}
     </main>
-    <footer className="footer"><span>ANIMELOG</span><span>Feito para organizar o que você assiste.</span><span className="storage-label">{storageMode === 'supabase' ? 'Sincronizado na nuvem' : 'Salvo neste navegador'}</span></footer>
+    <footer className="footer"><span>KATARU</span><span>Feito para organizar o que você assiste.</span><span className="storage-label">{storageMode === 'supabase' ? 'Sincronizado na nuvem' : 'Salvo neste navegador'}</span></footer>
 
     {searchOpen && <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) setSearchOpen(false); }}><section className="modal search-modal"><div className="modal-header"><div><p className="eyebrow">SUA COLEÇÃO</p><h2>Adicionar anime</h2></div><button className="icon-button" onClick={() => setSearchOpen(false)} aria-label="Fechar"><X/></button></div><form className="api-search" onSubmit={doSearch}><Search size={19}/><input autoFocus value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Digite o nome de um anime..."/><button className="primary-button" disabled={searching || !searchQuery.trim()}>{searching ? <LoaderCircle className="spin" size={16}/> : 'Pesquisar'}</button></form><p className="helper-text">A busca consulta o catálogo do MyAnimeList por meio da Jikan API.</p>
       {searchError && <p className="error-message">{searchError}</p>}{searching && <div className="search-loading"><LoaderCircle className="spin"/> Buscando títulos...</div>}

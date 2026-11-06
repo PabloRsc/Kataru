@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft,
+  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft,
   ChevronRight, Clapperboard, Clock3, Compass, Filter, Grid2X2, Heart, Home,
   Library, List, ListPlus, LoaderCircle, LogOut, MoreHorizontal, Pencil, Plus,
   Search, Settings2, SlidersHorizontal, Sparkles, Star, Trash2, Trophy, Tv,
@@ -104,7 +104,7 @@ export default function App() {
   const [discoverError, setDiscoverError] = useState('');
   const [listEditorOpen, setListEditorOpen] = useState(false);
   const [listEditing, setListEditing] = useState(null);
-  const [listForm, setListForm] = useState({ name: '', description: '', is_public: false });
+  const [listForm, setListForm] = useState({ name: '', description: '', is_public: false, is_ranked: false });
   const [listSaving, setListSaving] = useState(false);
   const [pendingListId, setPendingListId] = useState(null);
 
@@ -198,6 +198,7 @@ export default function App() {
       ...EMPTY_FORM,
       status: 'planned',
       episode_current: 0,
+      episodes_total_mode: result.episodes_total ? 'catalog' : 'unknown',
       format: result.format || '',
       title: result.title || ''
     });
@@ -221,6 +222,7 @@ export default function App() {
       notes: anime.notes || '',
       display_title: anime.display_title || '',
       episodes_total_manual: anime.episodes_total_manual ?? '',
+      episodes_total_mode: anime.episodes_total_manual ? 'manual' : anime.episodes_total ? 'catalog' : 'unknown',
       rewatch_count: anime.rewatch_count ?? 0,
       started_at: anime.started_at || '',
       completed_at: anime.completed_at || '',
@@ -262,7 +264,7 @@ export default function App() {
         title: form.is_manual ? form.title.trim() : (editor.title || form.title),
         display_title: form.display_title.trim() || null,
         episode_current: Math.max(0, Number(form.episode_current || 0)),
-        episodes_total_manual: form.episodes_total_manual === '' ? null : Math.max(1, Number(form.episodes_total_manual)),
+        episodes_total_manual: form.episodes_total_mode === 'manual' && form.episodes_total_manual !== '' ? Math.max(1, Number(form.episodes_total_manual)) : null,
         rewatch_count: Math.max(0, Number(form.rewatch_count || 0)),
         rating_personal: form.rating_personal === '' ? null : Number(form.rating_personal),
         started_at: form.started_at || null,
@@ -273,6 +275,8 @@ export default function App() {
         updated_at: new Date().toISOString(),
         created_at: editor.created_at || new Date().toISOString()
       };
+      if (anime.status === 'completed' && !anime.completed_at) anime.completed_at = new Date().toISOString().slice(0, 10);
+      if (anime.status === 'watching' && !anime.started_at) anime.started_at = new Date().toISOString().slice(0, 10);
       const saved = await saveAnime(anime);
       const latest = await getAnimeList();
       setItems(latest);
@@ -381,6 +385,7 @@ export default function App() {
         name: listForm.name.trim(),
         description: listForm.description.trim(),
         is_public: Boolean(listForm.is_public),
+        is_ranked: Boolean(listForm.is_ranked),
         anime_ids: listEditing?.anime_ids || [],
         updated_at: new Date().toISOString()
       };
@@ -401,7 +406,8 @@ export default function App() {
     setListForm({
       name: list?.name || '',
       description: list?.description || '',
-      is_public: Boolean(list?.is_public)
+      is_public: Boolean(list?.is_public),
+      is_ranked: Boolean(list?.is_ranked)
     });
     setListEditorOpen(true);
   }
@@ -445,6 +451,24 @@ export default function App() {
       notify('Anime removido da lista.');
     } catch (error) {
       notify(error.message || 'Não foi possível atualizar a lista.');
+    }
+  }
+
+  async function moveAnimeInList(list, anime, direction) {
+    const ids = (list.anime_ids || []).map(String);
+    const currentIndex = ids.indexOf(String(anime.mal_id));
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= ids.length) return;
+    [ids[currentIndex], ids[nextIndex]] = [ids[nextIndex], ids[currentIndex]];
+    const updated = { ...list, anime_ids: ids, updated_at: new Date().toISOString() };
+    try {
+      await saveAnimeList(updated);
+      const refreshed = await getAnimeLists();
+      setLists(refreshed);
+      setActiveList(refreshed.find(item => String(item.id) === String(list.id)) || updated);
+      notify('Ordem da lista atualizada.');
+    } catch (error) {
+      notify(error.message || 'Não foi possível reordenar a lista.');
     }
   }
 
@@ -499,6 +523,7 @@ export default function App() {
             onDelete={() => removeList(activeList)}
             onOpenAnime={setSelected}
             onRemoveAnime={anime => removeAnimeFromList(activeList, anime)}
+            onMoveAnime={(anime, direction) => moveAnimeInList(activeList, anime, direction)}
             onAdd={() => { setPendingListId(activeList.id); setSearchOpen(true); setSearchQuery(''); setResults([]); }}
           />
         ) : page === 'home' ? (
@@ -550,6 +575,7 @@ export default function App() {
             loading={discoverLoading}
             error={discoverError}
             selectedGenre={discoverGenre}
+            collection={items}
             onRetry={() => setDiscoverReload(value => value + 1)}
             onSelectGenre={genre => { setDiscoverGenre(genre); setDiscoverTab('genre'); }}
             onOpenAnime={anime => {
@@ -652,6 +678,7 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
 
 function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd }) {
   const featured = watching[0] || recentlyUpdated[0] || null;
+  const episodesWatched = items.reduce((sum, anime) => sum + Number(anime.episode_current || 0), 0);
   const nextEpisode = featured ? Number(featured.episode_current || 0) + 1 : 1;
 
   return (
@@ -666,6 +693,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
           <div><strong>{counts.all}</strong><span>na biblioteca</span></div>
           <div><strong>{counts.watching || 0}</strong><span>em andamento</span></div>
           <div><strong>{counts.completed || 0}</strong><span>concluídos</span></div>
+          <div><strong>{episodesWatched.toLocaleString('pt-BR')}</strong><span>episódios vistos</span></div>
         </div>
       </div>
 
@@ -812,9 +840,20 @@ function AnimeRow({ anime, onClick }) {
   );
 }
 
-function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGenre, onRetry, onSelectGenre, onOpenAnime, onAdd, isInCollection }) {
+function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGenre, collection, onRetry, onSelectGenre, onOpenAnime, onAdd, isInCollection }) {
   const [genreQuery, setGenreQuery] = useState('');
   const shownGenres = genres.filter(genre => String(genre.name || '').toLowerCase().includes(genreQuery.toLowerCase()));
+  const genreAffinity = {};
+  (collection || []).forEach(anime => (anime.genres || []).forEach(genre => {
+    genreAffinity[genre] = (genreAffinity[genre] || 0) + (anime.status === 'completed' || anime.status === 'watching' ? 2 : 1);
+  }));
+  const preferredGenres = Object.entries(genreAffinity).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name]) => name);
+  const recommendations = results
+    .filter(anime => !isInCollection(anime))
+    .map(anime => ({ ...anime, _matchScore: (anime.genres || []).filter(genre => preferredGenres.includes(genre)).length }))
+    .filter(anime => anime._matchScore > 0)
+    .sort((a, b) => b._matchScore - a._matchScore || Number(b.score_external || 0) - Number(a.score_external || 0))
+    .slice(0, 4);
   const title = tab === 'popular' ? 'Em alta nesta temporada' : tab === 'upcoming' ? 'Próximos lançamentos' : tab === 'genre' ? selectedGenre?.name || 'Gênero' : 'Temporada atual';
   const feature = results[0];
 
@@ -839,6 +878,12 @@ function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGe
               {feature && (
                 <section className="discover-feature" style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,17,23,.98) 0%, rgba(15,17,23,.82) 46%, rgba(15,17,23,.22) 100%), url("' + (feature.image_url || '') + '")' }}>
                   <div className="feature-copy"><span className="feature-tag"><Sparkles size={12} /> {tab === 'upcoming' ? 'CHEGANDO EM BREVE' : tab === 'popular' ? 'MAIS POPULARES' : 'DESTAQUE DA TEMPORADA'}</span><h2>{displayTitle(feature)}</h2><p>{feature.synopsis || 'Uma nova história para adicionar à sua lista.'}</p><div className="feature-meta"><span>{feature.year || 'Ano não informado'}</span>{feature.format && <><i>·</i><span>{feature.format}</span></>}{feature.score_external && <><i>·</i><span><Star size={12} fill="currentColor" />{Number(feature.score_external).toFixed(1)}</span></>}</div><div className="hero-actions"><button className="primary-button" onClick={() => onOpenAnime(feature)}><Plus size={15} />{isInCollection(feature) ? 'Ver na biblioteca' : 'Quero assistir'}</button></div></div>
+                </section>
+              )}
+              {recommendations.length > 0 && (
+                <section className="personalized-section">
+                  <div className="section-heading"><div><h2>Recomendados para você</h2><p>Seleções que combinam com os gêneros da sua biblioteca: {preferredGenres.slice(0, 3).join(' · ')}.</p></div><span className="personalized-label"><Sparkles size={12} /> PARA VOCÊ</span></div>
+                  <div className="discover-grid personalized-grid">{recommendations.map(anime => <DiscoverCard key={'recommended-' + anime.mal_id} anime={anime} exists={false} onOpen={() => onOpenAnime(anime)} onAdd={() => onAdd(anime)} />)}</div>
                 </section>
               )}
               <div className="section-heading discover-results-heading"><div><h2>{title}</h2><p>{tab === 'upcoming' ? 'Histórias que estão a caminho.' : 'Títulos que estão chamando atenção.'}</p></div><span className="catalog-count">{results.length} títulos</span></div>
@@ -905,18 +950,28 @@ function ListsPage({ items, lists, counts, onOpenStatus, onOpenList, onNewList, 
 
 function BookmarkIcon() { return <BookOpen size={20} />; }
 
-function CustomListDetail({ list, items, onBack, onEdit, onDelete, onOpenAnime, onRemoveAnime, onAdd }) {
+function CustomListDetail({ list, items, onBack, onEdit, onDelete, onOpenAnime, onRemoveAnime, onMoveAnime, onAdd }) {
   const entries = (list.anime_ids || []).map(id => items.find(anime => String(anime.mal_id) === String(id))).filter(Boolean);
   return (
     <div className="custom-list-detail">
       <button className="back-link" onClick={onBack}><ChevronLeft size={16} />Voltar para listas</button>
       <div className="custom-list-heading">
         <div className="list-heading-icon"><ListPlus size={28} /></div>
-        <div className="list-heading-copy"><p className="eyebrow">MINHA LISTA</p><h1>{list.name}<span className="heading-dot">.</span></h1><p>{list.description || 'Uma coleção organizada do seu jeito.'}</p><span className="list-visibility">{list.is_public ? 'Pública' : 'Privada'} · {entries.length} {entries.length === 1 ? 'anime' : 'animes'}</span></div>
+        <div className="list-heading-copy"><p className="eyebrow">MINHA LISTA{list.is_ranked ? ' · RANQUEADA' : ''}</p><h1>{list.name}<span className="heading-dot">.</span></h1><p>{list.description || 'Uma coleção organizada do seu jeito.'}</p><span className="list-visibility">{list.is_public ? 'Pública' : 'Privada'} · {entries.length} {entries.length === 1 ? 'anime' : 'animes'}{list.is_ranked ? ' · em ordem de preferência' : ''}</span></div>
         <div className="list-heading-actions"><button className="outline-button" onClick={onEdit}><Pencil size={14} />Editar</button><button className="icon-button danger" onClick={onDelete} aria-label="Excluir lista"><Trash2 size={16} /></button></div>
       </div>
       <div className="section-heading list-detail-subhead"><div><h2>Animes desta lista</h2><p>Os títulos continuam salvos na sua biblioteca.</p></div><button className="primary-button" onClick={onAdd}><Plus size={15} />Adicionar anime</button></div>
-      {entries.length ? <div className="library-grid">{entries.map(anime => <div className="list-anime-wrap" key={anime.id}><PosterCard anime={anime} onClick={() => onOpenAnime(anime)} /><button className="remove-from-list" onClick={() => onRemoveAnime(anime)}><X size={13} />Remover da lista</button></div>)}</div> : <div className="empty-state"><div className="empty-state-icon"><ListPlus size={24} /></div><h2>Esta lista ainda está vazia</h2><p>Adicione títulos que já estão na sua biblioteca ou descubra novos animes.</p><button className="primary-button" onClick={onAdd}><Plus size={15} />Buscar anime</button></div>}
+      {entries.length ? <div className="library-grid">{entries.map((anime, index) => <div className={'list-anime-wrap' + (list.is_ranked ? ' ranked-list-item' : '')} key={anime.id}>
+        {list.is_ranked && <span className="rank-number">#{index + 1}</span>}
+        <PosterCard anime={anime} onClick={() => onOpenAnime(anime)} />
+        <div className="list-item-actions">
+          {list.is_ranked && <div className="ranked-order-controls">
+            <button type="button" onClick={() => onMoveAnime(anime, -1)} disabled={index === 0} aria-label="Mover para cima"><ArrowUp size={13} /></button>
+            <button type="button" onClick={() => onMoveAnime(anime, 1)} disabled={index === entries.length - 1} aria-label="Mover para baixo"><ArrowDown size={13} /></button>
+          </div>}
+          <button className="remove-from-list" onClick={() => onRemoveAnime(anime)}><X size={13} />Remover da lista</button>
+        </div>
+      </div>)}</div> : <div className="empty-state"><div className="empty-state-icon"><ListPlus size={24} /></div><h2>Esta lista ainda está vazia</h2><p>Adicione títulos que já estão na sua biblioteca ou descubra novos animes.</p><button className="primary-button" onClick={onAdd}><Plus size={15} />Buscar anime</button></div>}
     </div>
   );
 }
@@ -941,6 +996,7 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
           <h1>{displayTitle(anime)}<span className="heading-dot">.</span></h1>
           {anime.title_english && anime.title_english !== anime.title && <p className="detail-original-title">{anime.title_english}</p>}
           <div className="detail-meta"><span>{anime.year || 'Ano não informado'}</span><i>·</i><span>{anime.format || 'Anime'}</span>{total && <><i>·</i><span>{total} episódios</span></>}{anime.season && <><i>·</i><span>{anime.season}</span></>}</div>
+          {anime.studios?.length > 0 && <p className="detail-studio">Estúdio: {anime.studios.join(', ')}</p>}
           <div className="detail-tags">{(anime.genres || []).map(genre => <span key={genre}>{genre}</span>)}</div>
 
           <div className="detail-status-block">
@@ -951,6 +1007,7 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
           <div className="detail-progress-card">
             <div className="progress-card-top"><div><span className="eyebrow">SEU PROGRESSO</span><strong>{current}<small> / {total || '?'}</small></strong><span>episódios assistidos</span></div><div className="progress-ring" style={{ '--progress': progress + '%' }}><strong>{total ? progress : '—'}<small>{total ? '%' : ''}</small></strong></div></div>
             <div className="progress-track"><span style={{ width: progress + '%' }} /></div>
+            {total && current >= total && <p className="progress-complete-hint"><Check size={13} />Você chegou ao total de episódios. O status foi marcado como Assistido.</p>}
             <div className="episode-controls"><span>Atualizar episódio</span><div><button className="episode-step" onClick={() => onEpisodeChange(-1)} disabled={!current}>− 1</button><strong>{current}</strong><button className="episode-step positive" onClick={() => onEpisodeChange(1)} disabled={Boolean(total && current >= total)}>+ 1 episódio</button></div></div>
           </div>
 
@@ -986,6 +1043,15 @@ function StarRating({ value, onChange }) {
 }
 
 function SearchModal({ query, setQuery, results, searching, error, onSearch, onClose, onAdd, onManual, isInCollection, allowExisting }) {
+  const [formatFilter, setFormatFilter] = useState('all');
+  const formatOptions = [
+    { id: 'all', label: 'Todos' },
+    { id: 'TV', label: 'Série (TV)' },
+    { id: 'Movie', label: 'Filme' },
+    { id: 'OVA', label: 'OVA' }
+  ];
+  const filteredResults = results.filter(result => formatFilter === 'all' || result.format === formatFilter);
+
   return (
     <div className="overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="modal search-modal">
@@ -993,8 +1059,9 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
         <form className="catalog-search" onSubmit={onSearch}><Search size={19} /><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Digite o nome de um anime..." /><button className="primary-button" disabled={searching || !query.trim()}>{searching ? <LoaderCircle className="spin" size={16} /> : 'Buscar anime'}</button></form>
         <p className="helper-text">Pesquise por título em português, inglês ou japonês romanizado.</p>
         {error && <div className="error-panel"><span>{error}</span><button className="outline-button" onClick={onManual}>Adicionar manualmente</button></div>}
+        {results.length > 0 && <div className="search-format-tabs" role="group" aria-label="Filtrar formato">{formatOptions.map(option => <button type="button" key={option.id} className={formatFilter === option.id ? 'active' : ''} onClick={() => setFormatFilter(option.id)}>{option.label}</button>)}</div>}
         {searching && <div className="loading-block compact-loading"><LoaderCircle className="spin" />Buscando resultados...</div>}
-        {results.length > 0 && <div className="results-list">{results.map(result => {
+        {filteredResults.length > 0 && <div className="results-list">{filteredResults.map(result => {
           const exists = isInCollection(result);
           const canAddToList = exists && allowExisting;
           return <article className="result-row" key={result.mal_id}>
@@ -1003,7 +1070,8 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
             <button className={exists && !canAddToList ? 'outline-button result-added' : 'outline-button'} disabled={exists && !canAddToList} onClick={() => onAdd(result)}>{canAddToList ? <><Plus size={14} />Adicionar à lista</> : exists ? <><Check size={14} />Na biblioteca</> : <><Plus size={14} />Adicionar</>}</button>
           </article>;
         })}</div>}
-        {!searching && !error && !results.length && <div className="search-empty"><Search size={25} /><p>Digite um título para começar a busca.</p><button className="text-link" onClick={onManual}>Não encontrou? Adicionar manualmente <ArrowRight size={13} /></button></div>}
+        {!searching && !error && !results.length && <div className="search-empty"><Search size={25} /><p>{query.trim() ? 'Nenhum anime encontrado para esta pesquisa.' : 'Digite um título para começar a busca.'}</p><button className="text-link" onClick={onManual}>{query.trim() ? 'Não encontrou no catálogo? Adicionar manualmente' : 'Adicionar manualmente'} <ArrowRight size={13} /></button></div>}
+        {!searching && results.length > 0 && !filteredResults.length && <div className="search-filter-empty"><p>Nenhum título neste formato. Escolha outra categoria.</p></div>}
         {results.length > 0 && <button className="manual-add-link" onClick={onManual}><Plus size={14} />Adicionar manualmente</button>}
       </section>
     </div>
@@ -1012,10 +1080,24 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
 
 function EditorModal({ anime, form, setForm, saving, onSubmit, onClose }) {
   const update = (key, value) => setForm(current => ({ ...current, [key]: value }));
+  const today = new Date().toISOString().slice(0, 10);
   const isNew = !anime.created_at;
   const nextEpisode = Number(form.episode_current || 0);
-  const total = Number(form.episodes_total_manual || anime.episodes_total || 0);
-  const canStartFromLast = anime.episodes_total != null && Number(anime.episodes_total) > 0;
+  const catalogTotal = Number(anime.episodes_total || 0);
+  const manualTotal = Number(form.episodes_total_manual || 0);
+  const total = form.episodes_total_mode === 'manual' ? manualTotal : form.episodes_total_mode === 'unknown' ? 0 : catalogTotal;
+  const showProgress = form.status !== 'planned';
+  const setStatus = status => setForm(current => ({
+    ...current,
+    status,
+    episode_current: status === 'completed' && total ? total : current.episode_current,
+    started_at: status === 'watching' && !current.started_at ? today : current.started_at,
+    completed_at: status === 'completed' && !current.completed_at ? today : current.completed_at
+  }));
+  const dateShortcuts = (key, value) => <div className="date-shortcuts">
+    <button type="button" onClick={() => update(key, today)}>Hoje</button>
+    <button type="button" onClick={() => update(key, '')}>Não lembro</button>
+  </div>;
 
   return (
     <div className="overlay editor-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
@@ -1023,19 +1105,37 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose }) {
         <div className="modal-header"><div><p className="eyebrow">{isNew ? 'PASSO 2 DE 2 · DEFINA O STATUS' : 'DETALHES DA SUA BIBLIOTECA'}</p><h2>{isNew ? 'Adicionar à biblioteca' : 'Editar anime'}</h2></div><button type="button" className="icon-button" onClick={onClose}><X size={18} /></button></div>
         <div className="editor-anime-preview">
           {anime.image_url ? <img src={anime.image_url} alt="" /> : <div className="editor-cover-fallback"><Clapperboard size={24} /></div>}
-          <div><strong>{anime.title || 'Novo anime'}</strong><span>{anime.year || 'Ano não informado'} · {anime.episodes_total || 'Total não informado'} episódios</span><small>{(anime.genres || []).slice(0, 3).join(' · ')}</small></div>
+          <div><strong>{anime.title || 'Novo anime'}</strong><span>{anime.year || 'Ano não informado'} · {catalogTotal || manualTotal || 'Total não informado'} episódios</span><small>{(anime.genres || []).slice(0, 3).join(' · ')}</small></div>
           <span className="editor-step">2/2</span>
         </div>
         {form.is_manual && <label className="field full"><span>Título do anime</span><input required value={form.title} onChange={event => update('title', event.target.value)} placeholder="Nome do anime" /></label>}
         <div className="editor-section">
           <span className="field-label">Status</span>
-          <div className="status-segment editor-status">{STATUSES.map(status => <button type="button" key={status.id} className={form.status === status.id ? 'selected tone-' + status.tone : ''} onClick={() => update('status', status.id)}>{status.label}</button>)}</div>
+          <div className="status-segment editor-status">{STATUSES.map(status => <button type="button" key={status.id} className={form.status === status.id ? 'selected tone-' + status.tone : ''} onClick={() => setStatus(status.id)}>{status.label}</button>)}</div>
+          {form.status === 'planned' && <p className="status-guidance">Pronto! O anime será salvo em “Quero assistir”. Você pode preencher o restante quando começar a assistir.</p>}
+          {form.status === 'watching' && <p className="status-guidance">Marque quantos episódios você já assistiu e registre quando começou.</p>}
+          {form.status === 'completed' && <p className="status-guidance">Registre os episódios concluídos e, se lembrar, a data em que terminou.</p>}
+          {(form.status === 'paused' || form.status === 'dropped') && <p className="status-guidance">Informe até onde você assistiu. Essas informações podem ser ajustadas depois.</p>}
         </div>
-        <div className="editor-grid">
-          <label className="field"><span>Episódio atual</span><div className="number-stepper"><button type="button" onClick={() => update('episode_current', Math.max(0, nextEpisode - 1))}>−</button><input type="number" min="0" max={total || undefined} value={form.episode_current} onChange={event => update('episode_current', event.target.value)} /><button type="button" onClick={() => update('episode_current', Math.min(total || 99999, nextEpisode + 1))}>+</button></div><small>{total ? 'de ' + total.toLocaleString('pt-BR') + ' episódios' : 'Total ainda não informado'}</small></label>
-          <label className="field"><span>Total de episódios (manual)</span><input type="number" min="1" placeholder={anime.episodes_total ? String(anime.episodes_total) : 'Informar total'} value={form.episodes_total_manual} onChange={event => update('episodes_total_manual', event.target.value)} /></label>
-          <label className="field"><span>Data de início</span><input type="date" value={form.started_at} onChange={event => update('started_at', event.target.value)} /></label>
-          <label className="field"><span>Data de término</span><input type="date" value={form.completed_at} onChange={event => update('completed_at', event.target.value)} /></label>
+        {showProgress && <>
+          <div className="editor-grid progress-editor-grid">
+            <label className="field"><span>{form.status === 'completed' ? 'Episódios assistidos' : 'Episódio atual'}</span><div className="number-stepper"><button type="button" onClick={() => update('episode_current', Math.max(0, nextEpisode - 1))}>−</button><input type="number" min="0" max={total || undefined} value={form.episode_current} onChange={event => update('episode_current', event.target.value)} /><button type="button" onClick={() => update('episode_current', Math.min(total || 99999, nextEpisode + 1))}>+</button></div><small>{total ? 'de ' + total.toLocaleString('pt-BR') + ' episódios' : 'Total ainda não informado'}</small></label>
+            {total > 0 && <div className="field episode-quick-actions"><span>Preenchimento rápido</span><div className="quick-action-buttons"><button type="button" onClick={() => update('episode_current', 0)}>Comecei no ep. 1</button>{catalogTotal > 0 && <button type="button" onClick={() => update('episode_current', Math.max(0, catalogTotal - 1))}>Comecei pelo último</button>}</div></div>}
+          </div>
+          <div className="field total-mode-field">
+            <span>Total de episódios</span>
+            <div className="total-mode-options">
+              <button type="button" className={form.episodes_total_mode === 'catalog' ? 'active' : ''} onClick={() => update('episodes_total_mode', 'catalog')} disabled={!catalogTotal}>Do catálogo{catalogTotal ? ' · ' + catalogTotal : ''}</button>
+              <button type="button" className={form.episodes_total_mode === 'unknown' ? 'active' : ''} onClick={() => update('episodes_total_mode', 'unknown')}>Não sei</button>
+              <button type="button" className={form.episodes_total_mode === 'manual' ? 'active' : ''} onClick={() => update('episodes_total_mode', 'manual')}>Informar manualmente</button>
+            </div>
+            {form.episodes_total_mode === 'manual' && <input className="total-manual-input" type="number" min="1" value={form.episodes_total_manual} onChange={event => update('episodes_total_manual', event.target.value)} placeholder="Digite o total de episódios" />}
+            {form.episodes_total_mode === 'unknown' && <small>Você poderá informar o total mais tarde.</small>}
+          </div>
+        </>}
+        {(form.status === 'watching' || form.status === 'paused' || form.status === 'dropped') && <label className="field date-field"><span>Data de início</span><input type="date" value={form.started_at} onChange={event => update('started_at', event.target.value)} />{dateShortcuts('started_at')}</label>}
+        {form.status === 'completed' && <label className="field date-field"><span>Data de término</span><input type="date" value={form.completed_at} onChange={event => update('completed_at', event.target.value)} />{dateShortcuts('completed_at')}</label>}
+        <div className="editor-grid secondary-editor-grid">
           <label className="field"><span>Vezes que reassistiu</span><input type="number" min="0" value={form.rewatch_count} onChange={event => update('rewatch_count', event.target.value)} /></label>
           <label className="field"><span>Formato</span><select value={form.format} onChange={event => update('format', event.target.value)}><option value="">Não informado</option>{['TV', 'Movie', 'OVA', 'ONA', 'Special', 'Music'].map(value => <option key={value} value={value}>{value === 'Movie' ? 'Filme' : value}</option>)}</select></label>
           <label className="field full"><span>Título exibido (opcional)</span><input value={form.display_title} onChange={event => update('display_title', event.target.value)} placeholder={anime.title || 'Nome que aparecerá na biblioteca'} /></label>

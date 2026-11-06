@@ -1,4 +1,4 @@
-# AnimeLog — status do projeto
+# Kataru — status do projeto
 
 Última atualização: 2026-11-06
 
@@ -9,7 +9,7 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 ## Implementado no repositório
 
 - Aplicação React + Vite.
-- Pesquisa de catálogo via Jikan API.
+- Pesquisa de catálogo via funções serverless da Vercel, com timeout, retry e cache; Jikan permanece como fonte externa.
 - Cadastro, edição, exclusão, filtros e detalhes da coleção.
 - Persistência local via localStorage quando o Supabase não está configurado.
 - Cliente Supabase com sessão persistente.
@@ -36,13 +36,13 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 
 ## Pendências prioritárias
 
-1. Executar npm install e npm run build.
-2. Testar fluxos de autenticação e políticas RLS com duas contas reais.
-3. Completar/verificar o fluxo de redefinição de senha após retorno do e-mail.
-4. Implementar importação opcional de coleção local para conta autenticada.
-5. Revisar tratamento de erros em exclusão e sincronização.
-6. Melhorar estados visuais de carregamento, erros e acessibilidade.
-7. Planejar rotina de atualização automática de metadados; ainda não implementada.
+1. Confirmar deploy da nova API de catálogo na Vercel e testar `/api/anime/search?q=one%20piece`.\n2. Executar npm install e npm run build.
+3. Testar fluxos de autenticação e políticas RLS com duas contas reais.
+4. Completar/verificar o fluxo de redefinição de senha após retorno do e-mail.
+5. Implementar importação opcional de coleção local para conta autenticada.
+6. Revisar tratamento de erros em exclusão e sincronização.
+7. Melhorar estados visuais de carregamento, erros e acessibilidade.
+8. Planejar rotina de atualização automática de metadados; ainda não implementada.
 
 ## Arquivos centrais
 
@@ -55,4 +55,4 @@ Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário 
 
 ## Verificação
 
-As alterações foram publicadas diretamente na branch main do GitHub. Build e testes automatizados ainda não foram executados nesta etapa.
+As alterações foram publicadas diretamente na branch main do GitHub. A nova arquitetura de catálogo ainda precisa ser validada pelo próximo deploy da Vercel; build e testes automatizados não foram executados neste ambiente.

@@ -35,6 +35,13 @@ create table if not exists public.anime_lists (
   updated_at timestamptz not null default now()
 );
 alter table public.anime_lists add column if not exists is_ranked boolean not null default false;
+
+-- O upsert da aplicação usa a combinação owner_id + id como chave de conflito.
+create unique index if not exists anime_lists_owner_id_key
+  on public.anime_lists(owner_id, id);
+create index if not exists anime_lists_owner_updated_idx
+  on public.anime_lists(owner_id, updated_at desc);
+
 alter table public.anime_lists enable row level security;
 
 drop policy if exists "Users can read their own anime lists" on public.anime_lists;

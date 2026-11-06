@@ -139,6 +139,7 @@ function toRow(anime, ownerId) {
     season: anime.season || null,
     format: anime.format || null,
     genres: anime.genres || [],
+    studios: anime.studios || [],
     score_external: anime.score_external ?? null,
     status: anime.status || 'planned',
     episode_current: Number(anime.episode_current || 0),
@@ -164,6 +165,7 @@ function normalizeLocalAnime(anime) {
     id: String(anime.id || anime.mal_id),
     mal_id: Number(anime.mal_id),
     genres: anime.genres || [],
+    studios: anime.studios || [],
     status: anime.status || 'planned',
     episode_current: Number(anime.episode_current || 0),
     rewatch_count: Number(anime.rewatch_count || 0),
@@ -183,6 +185,7 @@ function toListRow(list, ownerId) {
     name: String(list.name || '').trim(),
     description: list.description || null,
     is_public: Boolean(list.is_public),
+    is_ranked: Boolean(list.is_ranked),
     anime_ids: Array.from(new Set((list.anime_ids || []).map(String))),
     created_at: list.created_at || new Date().toISOString(),
     updated_at: list.updated_at || new Date().toISOString()
@@ -190,5 +193,5 @@ function toListRow(list, ownerId) {
 }
 
 function fromListRow(row) {
-  return { ...row, id: String(row.id), anime_ids: (row.anime_ids || []).map(String), is_public: Boolean(row.is_public) };
+  return { ...row, id: String(row.id), anime_ids: (row.anime_ids || []).map(String), is_public: Boolean(row.is_public), is_ranked: Boolean(row.is_ranked) };
 }

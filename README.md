@@ -1,34 +1,54 @@
 # AnimeLog
 
-Gerenciador pessoal de animes, com interface inspirada no Letterboxd, catálogo consultado pela Jikan API e armazenamento local ou Supabase.
+Gerenciador pessoal de animes com interface inspirada no Letterboxd, catálogo consultado pela [Jikan API](https://docs.api.jikan.moe/) e armazenamento local ou Supabase.
 
 ## Requisitos
+
 - Node.js 20 ou superior
 - npm
 
 ## Executar localmente
+
 ```bash
 npm install
 npm run dev
 ```
+
 Abra o endereço informado pelo Vite (normalmente http://localhost:5173).
 
-Na primeira execução, sem credenciais Supabase, os dados ficam salvos no `localStorage` do navegador. Isso permite testar cadastro, edição e exclusão imediatamente, mas os dados ficam apenas naquele navegador/dispositivo.
+Sem credenciais Supabase, a aplicação usa o `localStorage`. Os dados ficam apenas no navegador e dispositivo atuais; não há sincronização entre dispositivos.
 
-## Supabase (opcional nesta primeira etapa)
-1. Crie um projeto em https://supabase.com.
-2. Execute `supabase/schema.sql` no SQL Editor.
+## Configuração do Supabase
+
+O suporte ao Supabase existe no código, mas **não considere a persistência em nuvem pronta para produção**. A tabela habilita RLS e ainda precisa de autenticação, identificação do proprietário dos registros e políticas de acesso compatíveis com o modelo de usuário.
+
+1. Crie um projeto no [Supabase](https://supabase.com).
+2. Revise e execute `supabase/schema.sql` no SQL Editor.
 3. Copie `.env.example` para `.env` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
-4. Configure autenticação e políticas RLS antes de publicar com dados pessoais. O esquema fornecido habilita RLS intencionalmente e não abre acesso público.
+4. Implemente autenticação e políticas RLS por usuário antes de inserir dados pessoais ou publicar a aplicação.
 5. Reinicie o servidor Vite.
 
+Nunca coloque uma chave `service_role` em variáveis `VITE_*` ou no código do navegador. O arquivo `.env` é ignorado pelo Git; compartilhe apenas o modelo sem credenciais em `.env.example`.
+
 ## Catálogo
-A pesquisa usa a Jikan API (MyAnimeList não oficial): https://docs.api.jikan.moe/ . A API tem limites de requisição e pode ficar indisponível. O app não mantém uma base própria de catálogo.
 
-## Atualização automática semanal
-A interface já contém atualização manual por título. A rotina semanal deve ser configurada no Supabase Cron/Edge Function depois de conectar e proteger a base com autenticação. A rotina deverá consultar os IDs MyAnimeList armazenados e atualizar apenas os metadados do catálogo, preservando `status`, `episode_current`, `rating_personal` e `notes`. Não configure uma rotina pública antes de definir autenticação e políticas de acesso.
+A pesquisa e a atualização manual consultam a Jikan API, uma API não oficial para dados do MyAnimeList. Há limites de requisição e o serviço pode ficar indisponível. O aplicativo não mantém uma base própria de catálogo.
 
-## Build
+## Atualização automática
+
+A aplicação oferece atualização manual por título. A rotina semanal descrita no planejamento ainda **não está implementada**. Antes de criá-la, será necessário concluir autenticação e políticas de acesso no Supabase. A rotina deverá atualizar somente metadados do catálogo, preservando status, episódio atual, nota pessoal e observações.
+
+## Build de produção
+
 ```bash
 npm run build
+npm run preview
 ```
+
+## Estrutura principal
+
+- `src/App.jsx`: interface, coleção, pesquisa e edição.
+- `src/api.js`: integração e normalização dos dados da Jikan.
+- `src/storage.js`: persistência local ou Supabase.
+- `src/styles.css`: estilos da aplicação.
+- `supabase/schema.sql`: esquema inicial do banco.

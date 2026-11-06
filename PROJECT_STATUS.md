@@ -6,58 +6,69 @@
 
 Aplicativo de coleção pessoal de animes com contas individuais. Cada usuário deve acessar somente sua própria coleção, notas, progresso e observações. Interface em português.
 
-## Implementado no repositório
+## Redesign da interface
+
+A estrutura foi reorganizada de acordo com os mockups enviados:
+
+- Navegação principal: Início, Biblioteca, Descobrir e Listas.
+- Início com anime em andamento, ação rápida de episódio e prateleiras Assistindo, Assistidos recentemente e Quero assistir.
+- Biblioteca em grade/lista, busca, status, filtros por gênero/ano/formato/nota e ordenação.
+- Descobrir com temporada atual, populares, próximos lançamentos e gêneros.
+- Detalhes com status, progresso, avaliação por estrelas, anotações, datas, reassistidas e metadados.
+- Fluxos de adição/edição e adição manual de título.
+- Listas automáticas por status e listas personalizadas.
+- Navegação inferior em dispositivos móveis.
+- Calendário de lançamentos não faz parte desta versão.
+
+## Implementado no repositório (branch de redesign)
 
 - Aplicação React + Vite.
-- Pesquisa de catálogo via funções serverless da Vercel, com timeout, retry e cache; Jikan como fonte principal e AniList como fallback, com normalização por ID MAL.
-- Cadastro, edição, exclusão, filtros e detalhes da coleção.
-- Persistência local via localStorage quando o Supabase não está configurado.
+- Pesquisa e detalhes de catálogo via funções serverless da Vercel, Jikan como fonte principal e AniList como fallback.
+- Endpoint serverless adicional para temporada atual, próximos lançamentos, populares e gêneros na área Descobrir.
+- Página de Descobrir com rotas de temporada, popularidade, próximos lançamentos e gêneros.
+- Biblioteca com filtros, ordenação e alternância grade/lista.
+- Progresso de episódios, status, nota, datas, reassistidas, título de exibição, total manual e anotações.
+- Listas automáticas por status e listas personalizadas.
+- Persistência local e métodos Supabase com isolamento por owner_id.
+- Migração SQL para instalações existentes e schema atualizado para novas instalações.
+- Interface responsiva com barra inferior mobile.
+
+## Autenticação e configuração
+
 - Cliente Supabase com sessão persistente.
 - Tela de autenticação por e-mail: cadastro, login e solicitação de redefinição de senha.
 - Controle de sessão na entrada do app e ação para sair.
 - Armazenamento Supabase filtrado por owner_id.
-- Esquema SQL com owner_id, índice único por proprietário + mal_id e políticas RLS individuais.
-- README, .gitignore e .env.example.
-
-## Configuração necessária antes de usar contas reais
-
-1. Criar projeto Supabase.
-2. Revisar e executar supabase/schema.sql.
-3. Habilitar o provedor Email e configurar URLs de redirecionamento no Supabase Auth.
-4. Definir VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no ambiente local/deploy.
-5. Testar cadastro, confirmação de e-mail, login, sessão, logout e isolamento entre duas contas.
+- Execute supabase/schema.sql em novas instalações.
+- Para bancos existentes, faça backup e execute supabase/redesign-migration.sql.
+- Testar cadastro, confirmação de e-mail, login, sessão, logout e isolamento entre duas contas.
 
 ## Cuidados de migração
 
-- O schema anterior tinha mal_id único global e não tinha owner_id. O SQL novo remove a constraint global e cria unicidade por owner_id + mal_id.
-- Registros antigos ficam com owner_id nulo e não aparecem para usuários autenticados. Fazer backup e atribuir manualmente cada registro ao dono correto antes de qualquer migração.
+- Registros antigos sem owner_id permanecem inacessíveis a usuários autenticados até serem atribuídos manualmente ao dono correto. Fazer backup e não associar registros automaticamente.
 - Dados em localStorage não são migrados automaticamente para Supabase.
 - Nunca usar service_role no frontend.
+- A opção de lista "Pública" é apenas armazenada; compartilhamento público não foi implementado.
 
-## Pendências prioritárias
+## Validação pendente
 
-1. Confirmar deploy da API de catálogo com fallback AniList na Vercel e testar `/api/anime/search?q=one%20piece`.
-2. Executar npm install e npm run build.
+1. Executar npm install e npm run build no ambiente do projeto.
+2. Aplicar o schema/migração no Supabase de destino e testar criação, edição e exclusão de listas.
 3. Testar fluxos de autenticação e políticas RLS com duas contas reais.
-4. Completar/verificar o fluxo de redefinição de senha após retorno do e-mail.
-5. Implementar importação opcional de coleção local para conta autenticada.
-6. Revisar tratamento de erros em exclusão e sincronização.
-7. Melhorar estados visuais de carregamento, erros e acessibilidade.
-8. Planejar rotina de atualização automática de metadados; ainda não implementada.
+4. Testar busca, descoberta, detalhes e gravação de progresso no deploy.
+5. Revisar acessibilidade e comportamento visual em larguras variadas.
+6. Atualização automática de metadados e importação de coleção local continuam fora do escopo implementado.
 
 ## Arquivos centrais
 
-- `src/App.jsx` — interface principal.
-- `src/AuthGate.jsx` — autenticação e controle de sessão.
-- `src/storage.js` — persistência local/Supabase.
-- `src/api.js` — cliente da API própria de catálogo.
-- `api/anime/` — endpoints serverless de pesquisa e detalhes.
-- `server/jikan.js` — Jikan com timeout e retry limitado.
-- `server/anilist.js` — fallback AniList e normalização.
-- `vite.config.js` — proxy local das rotas de catálogo.
-- `src/styles.css` — interface.
-- `supabase/schema.sql` — banco e RLS.
-
-## Verificação
-
-As alterações foram publicadas diretamente na branch main do GitHub. A arquitetura com fallback AniList, enriquecimento de episódios disponíveis, controles rápidos de progresso/status e melhorias responsivas da interface foram publicadas na branch main. Aguardar deploy Ready e validar pesquisa, detalhes e gravação de progresso. Build e testes automatizados ainda não foram executados neste ambiente.
+- src/App.jsx — navegação e telas.
+- src/AuthGate.jsx — autenticação e controle de sessão.
+- src/storage.js — persistência local/Supabase.
+- src/api.js — cliente da API de catálogo e descoberta.
+- api/anime/ — endpoints serverless de pesquisa e detalhes.
+- server/jikan.js — Jikan com timeout e retry limitado.
+- server/anilist.js — fallback AniList e normalização.
+- vite.config.js — proxy local das rotas de catálogo.
+- src/styles.css — interface responsiva.
+- supabase/schema.sql — schema e RLS para novas instalações.
+- supabase/redesign-migration.sql — migração para instalações existentes.

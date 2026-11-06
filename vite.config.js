@@ -1,26 +1,27 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const jikanProxy = rewrite => ({
+  target: 'https://api.jikan.moe',
+  changeOrigin: true,
+  secure: true,
+  rewrite
+});
+
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api/anime': {
-        target: 'https://api.jikan.moe',
-        changeOrigin: true,
-        secure: true,
-        rewrite: path => {
-          if (path === '/api/anime/search') return '/v4/anime';
-          const prefix = '/api/anime/';
-          if (path.startsWith(prefix)) {
-            const id = path.slice(prefix.length);
-            if (id && [...id].every(char => char >= '0' && char <= '9')) {
-              return '/v4/anime/' + id + '/full';
-            }
-          }
-          return path;
-        }
-      }
+      '/api/catalog': jikanProxy(path => path.replace(/^\/api\/catalog/, '/v4')),
+      '/api/seasons': jikanProxy(path => path.replace(/^\/api\/seasons/, '/v4/seasons')),
+      '/api/top': jikanProxy(path => path.replace(/^\/api\/top/, '/v4/top')),
+      '/api/anime': jikanProxy(path => {
+        if (path === '/api/anime/search') return '/v4/anime';
+        if (path === '/api/anime' || path === '/api/anime/') return '/v4/anime';
+        const suffix = path.slice('/api/anime/'.length);
+        if (/^\d+$/.test(suffix)) return '/v4/anime/' + suffix + '/full';
+        return '/v4/anime/' + suffix;
+      })
     }
   }
 });

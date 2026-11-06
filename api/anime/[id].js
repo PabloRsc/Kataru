@@ -7,10 +7,13 @@ export default async function handler(req, res) {
   }
 
   const id = String(req.query.id || '');
-  if (!/^\\d+$/.test(id)) return res.status(400).json({ message: 'Identificador de anime inválido.' });
+  const numericId = Number(id);
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) {
+    return res.status(400).json({ message: 'Identificador de anime inválido.' });
+  }
 
   try {
-    const result = await requestJikan(`/anime/${id}/full`);
+    const result = await requestJikan(`/anime/${numericId}/full`);
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
     return res.status(200).json(result.data);
   } catch (error) {

@@ -29,7 +29,7 @@ export async function searchAnime(query) {
 
 export async function fetchAnime(malId) {
   const data = await request('/' + encodeURIComponent(malId));
-  return normalizeAnime(data.data);
+  return normalizeAnime(data.data || data);
 }
 
 export async function discoverAnime(kind = 'current') {

@@ -13,9 +13,9 @@ export default async function handler(req, res) {
 
   const params = new URLSearchParams({
     q: query,
-    limit: '8',
+    limit: '15',
     sfw: 'true',
-    order_by: 'popularity',
+    order_by: 'title',
     sort: 'asc'
   });
 

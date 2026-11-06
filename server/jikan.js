@@ -8,7 +8,7 @@ export async function requestJikan(path) {
   // Keep the total execution comfortably within a serverless request window.
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
+    const timeout = setTimeout(() => controller.abort(), 2500);
 
     try {
       const response = await fetch(JIKAN_BASE + path, {
@@ -49,7 +49,7 @@ export async function requestJikan(path) {
       clearTimeout(timeout);
     }
 
-    await sleep(300);
+    await sleep(200);
   }
 
   const unavailable = new Error(lastError?.message || 'Catálogo temporariamente indisponível.');

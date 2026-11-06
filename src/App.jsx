@@ -105,6 +105,7 @@ export default function App() {
   const [listEditing, setListEditing] = useState(null);
   const [listForm, setListForm] = useState({ name: '', description: '', is_public: false });
   const [listSaving, setListSaving] = useState(false);
+  const [pendingListId, setPendingListId] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -275,8 +276,16 @@ export default function App() {
       const latest = await getAnimeList();
       setItems(latest);
       setEditor(null);
-      setSelected(saved || anime);
-      notify('Anime salvo na sua biblioteca.');
+      if (pendingListId) {
+        const targetListId = pendingListId;
+        setPendingListId(null);
+        setSelected(null);
+        await addAnimeToList(saved || anime, targetListId);
+        notify('Anime salvo e adicionado à lista.');
+      } else {
+        setSelected(saved || anime);
+        notify('Anime salvo na sua biblioteca.');
+      }
     } catch (error) {
       notify(error.message || 'Não foi possível salvar o anime.');
     } finally {
@@ -414,7 +423,11 @@ export default function App() {
     const ids = Array.from(new Set([...(list.anime_ids || []).map(String), String(anime.mal_id)]));
     try {
       await saveAnimeList({ ...list, anime_ids: ids, updated_at: new Date().toISOString() });
-      setLists(await getAnimeLists());
+      const refreshed = await getAnimeLists();
+      setLists(refreshed);
+      if (activeList && String(activeList.id) === String(list.id)) {
+        setActiveList(refreshed.find(item => String(item.id) === String(list.id)) || { ...list, anime_ids: ids });
+      }
       notify('Anime adicionado à lista "' + list.name + '".');
     } catch (error) {
       notify(error.message || 'Não foi possível atualizar a lista.');
@@ -485,7 +498,7 @@ export default function App() {
             onDelete={() => removeList(activeList)}
             onOpenAnime={setSelected}
             onRemoveAnime={anime => removeAnimeFromList(activeList, anime)}
-            onAdd={() => { setSearchOpen(true); setSearchQuery(''); setResults([]); }}
+            onAdd={() => { setPendingListId(activeList.id); setSearchOpen(true); setSearchQuery(''); setResults([]); }}
           />
         ) : page === 'home' ? (
           <HomePage
@@ -594,7 +607,7 @@ export default function App() {
           setForm={setForm}
           saving={saving}
           onSubmit={submitAnime}
-          onClose={() => setEditor(null)}
+          onClose={() => { setEditor(null); setPendingListId(null); }}
         />
       )}
 

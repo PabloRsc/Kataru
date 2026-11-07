@@ -1178,7 +1178,7 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
               <DiscoverShelf
                 title={feedTitle}
                 subtitle={tab === 'season' ? 'Títulos que fazem parte da temporada de animes atual.' : tab === 'popular' ? 'Ranking geral de popularidade do catálogo.' : tab === 'upcoming' ? 'Obras anunciadas para temporadas futuras.' : 'Títulos classificados neste gênero.'}
-                items={results}
+                items={results.filter(anime => String(anime.mal_id) !== String(feature?.mal_id))}
                 collectionCheck={isInCollection}
                 onOpenAnime={onOpenAnime}
                 onAdd={onAdd}

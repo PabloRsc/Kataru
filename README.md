@@ -39,7 +39,7 @@ Sem variáveis Supabase, o app permanece em modo local para desenvolvimento. Os 
 5. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
 6. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
 
-A tela de conta inclui cadastro, login, redefinição de senha e saída. Com Supabase configurado, a coleção exige sessão autenticada.
+A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha ou Google (quando o provedor estiver habilitado), confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. Com Supabase configurado, a coleção exige sessão autenticada.
 
 ### Atualizar uma instalação Supabase existente
 

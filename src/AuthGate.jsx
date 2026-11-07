@@ -74,7 +74,6 @@ function Showcase({ mode, posters, onMarkEpisode }) {
         <div className="auth-showcase-progress"><i /></div>
         <button type="button" onClick={onMarkEpisode}>Marcar ep. 9 como visto <ChevronRight size={15} /></button>
       </div>
-      <div className="auth-showcase-footnote"><Sparkles size={13} /> Sua coleção, no seu ritmo.</div>
     </section>
   );
 }
@@ -460,7 +459,7 @@ export default function AuthGate({ children }) {
   const displayPosters = posters.slice(0, 3);
 
   return (
-    <main className="auth-screen">
+    <main className="kataru-auth-screen">
       <div className="auth-ambient auth-ambient-one" />
       <div className="auth-ambient auth-ambient-two" />
       <div className="auth-ambient auth-ambient-three" />
@@ -477,7 +476,6 @@ export default function AuthGate({ children }) {
         <section className="auth-left">
           <div className="auth-left-brand"><Brand /></div>
           <Showcase mode={mode} posters={displayPosters} onMarkEpisode={openShowcase} />
-          <div className="auth-bottom-note">Um universo de histórias. Uma biblioteca só sua.</div>
         </section>
 
         <section className="auth-right">

@@ -83,11 +83,13 @@ export function normalizeAnime(a = {}) {
   const titleEnglish = a.title_english || '';
   const titleJapanese = a.title_japanese || '';
   const titleSynonyms = Array.isArray(a.title_synonyms) ? a.title_synonyms : [];
+  const listedTitles = Array.isArray(a.titles) ? a.titles.map(entry => entry?.title) : [];
   const titleAliases = [...new Set([
     title,
     titleEnglish,
     titleJapanese,
-    ...titleSynonyms
+    ...titleSynonyms,
+    ...listedTitles
   ].map(value => String(value || '').trim()).filter(Boolean))];
   return {
     mal_id: a.mal_id,

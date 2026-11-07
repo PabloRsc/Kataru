@@ -2,8 +2,46 @@ import { createClient } from '@supabase/supabase-js';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const AUTH_PERSISTENCE_KEY = 'kataru.auth.persistence.v1';
+
+function authStorage() {
+  const selectedStorage = () => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(AUTH_PERSISTENCE_KEY) === 'session'
+      ? window.sessionStorage
+      : window.localStorage;
+  };
+  return {
+    getItem(name) {
+      return selectedStorage()?.getItem(name) ?? null;
+    },
+    setItem(name, value) {
+      const current = selectedStorage();
+      if (!current) return;
+      const other = current === window.localStorage ? window.sessionStorage : window.localStorage;
+      other.removeItem(name);
+      current.setItem(name, value);
+    },
+    removeItem(name) {
+      if (typeof window === 'undefined') return;
+      window.localStorage.removeItem(name);
+      window.sessionStorage.removeItem(name);
+    }
+  };
+}
+
+export function setAuthPersistence(remember) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(AUTH_PERSISTENCE_KEY, remember ? 'persistent' : 'session');
+}
+
 export const supabase = url && key ? createClient(url, key, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  auth: {
+    storage: authStorage(),
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
 }) : null;
 
 const LOCAL_KEY = 'animelog.collection.v1';

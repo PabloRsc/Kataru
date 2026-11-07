@@ -33,11 +33,11 @@ Sem variáveis Supabase, o app permanece em modo local para desenvolvimento. Os 
 ## Configurar contas e sincronização
 
 1. Crie um projeto no [Supabase](https://supabase.com).
-2. No SQL Editor, revise e execute **supabase/schema.sql**. O script cria as tabelas e políticas RLS por usuário.
-3. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
-4. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para os ambientes local e publicado.
-5. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
-6. Se estiver atualizando um projeto que já tem as tabelas da coleção, execute também **supabase/auth-profiles-setup.sql** para criar a tabela de perfis e a verificação segura de nomes de usuário (essa configuração já foi aplicada no projeto Supabase conectado ao Kataru).
+2. Para um banco novo, execute **supabase/schema.sql**. Para um banco já usado por uma versão anterior, faça backup e execute **supabase/redesign-migration.sql**.
+3. Execute **supabase/auth-profiles-setup.sql** para criar perfis e a verificação segura de nomes de usuário. Essa configuração já foi aplicada no projeto Supabase conectado ao Kataru.
+4. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
+5. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
+6. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
 7. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
 
 A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha, opção Google, confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. Com Supabase configurado, a coleção exige sessão autenticada.
@@ -50,7 +50,7 @@ Os links de Termos e Privacidade estão previstos no formulário; os destinos e 
 
 ### Atualizar uma instalação Supabase existente
 
-Se o banco já está em uso com a versão anterior do Kataru, faça backup e execute **supabase/redesign-migration.sql** no SQL Editor. Essa migração acrescenta os campos de edição e progresso, habilita o status "Abandonado" e cria a tabela de listas personalizadas com políticas RLS.
+Se o banco já está em uso com a versão anterior do Kataru, faça backup e execute **supabase/redesign-migration.sql** e **supabase/auth-profiles-setup.sql** no SQL Editor. As migrações acrescentam os campos de edição e progresso, habilitam o status "Abandonado", criam listas personalizadas e adicionam perfis com nome de usuário único.
 
 Não execute essa migração em um banco vazio como substituto de **schema.sql**; para uma instalação nova, use o schema completo.
 

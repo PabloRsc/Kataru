@@ -580,7 +580,7 @@ export default function AuthGate({ children }) {
                 <button className="auth-back-link" type="button" onClick={() => changeMode('login')}><ArrowLeft size={15} /> Voltar para entrar</button>
                 <div className="auth-kicker">RECUPERAR ACESSO</div>
                 <h1>Esqueceu a senha?</h1>
-                <p className="auth-subtitle">Informe seu e-mail e enviaremos um link para criar uma nova senha. O link vale por 30 minutos.</p>
+                <p className="auth-subtitle">Informe seu e-mail e enviaremos um link seguro para criar uma nova senha.</p>
                 <form onSubmit={submitRecovery}>
                   <AuthInput icon={Mail} label="E-mail" value={email} onChange={event => setEmail(event.target.value)} placeholder="voce@exemplo.com" type="email" autoComplete="email" required />
                   {error && <AuthFeedback tone="error">{error}</AuthFeedback>}
@@ -638,9 +638,9 @@ export default function AuthGate({ children }) {
 
             {mode === 'new-password' && (
               <>
-                <div className="auth-kicker">ETAPA 3 · LINK VÁLIDO POR 30 MIN</div>
+                <div className="auth-kicker">ETAPA 3 · NOVA SENHA</div>
                 <h1>Quase lá</h1>
-                <p className="auth-subtitle">Crie uma nova senha que você não usa em outros sites.</p>
+                <p className="auth-subtitle">Escolha uma senha que você não usa em outros sites.</p>
                 <form onSubmit={submitNewPassword}>
                   <AuthInput icon={LockKeyhole} label="Nova senha" value={password} onChange={event => setPassword(event.target.value)} placeholder="Nova senha" type={showPassword ? 'text' : 'password'} autoComplete="new-password" right={<button className="auth-visibility" type="button" onClick={() => setShowPassword(value => !value)} aria-label="Mostrar senha">{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>} required />
                   <div className="auth-password-rules">

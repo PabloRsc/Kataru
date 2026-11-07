@@ -200,7 +200,7 @@ export default function App() {
     setDiscoverError('');
 
     if (discoverTab === 'genres') {
-      Promise.all([fetchAnimeGenres(), discoverAnime('popular')])
+      Promise.all([fetchAnimeGenres(), discoverAnime('popular').catch(() => [])])
         .then(([genres, recommendations]) => {
           if (!active) return;
           setDiscoverGenres(genres || []);
@@ -216,14 +216,14 @@ export default function App() {
         ? 'genre-' + encodeURIComponent(discoverGenre.name || discoverGenre.mal_id || '')
         : discoverTab;
       const recommendationRequest = discoverTab === 'popular'
-        ? Promise.resolve(null)
-        : discoverAnime('popular');
+        ? discoverAnime('top-rated').catch(() => [])
+        : discoverAnime('popular').catch(() => []);
 
       Promise.all([discoverAnime(kind), recommendationRequest])
         .then(([data, recommendations]) => {
           if (!active) return;
           setDiscoverResults(data || []);
-          setDiscoverRecommendations(discoverTab === 'popular' ? (data || []) : (recommendations || []));
+          setDiscoverRecommendations(recommendations || []);
         })
         .catch(error => {
           if (active) setDiscoverError(error.message || 'Não foi possível carregar o catálogo.');
@@ -1076,7 +1076,7 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
   const preferredGenres = Object.entries(genreAffinity).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name]) => name);
   const feature = results[0] || null;
   const recommendations = (recommendationSource || [])
-    .filter(anime => !isInCollection(anime) && String(anime.mal_id) !== String(feature?.mal_id))
+    .filter(anime => !isInCollection(anime) && !(results || []).some(result => String(result.mal_id) === String(anime.mal_id)))
     .map(anime => ({
       ...anime,
       _matchedGenres: (anime.genres || []).filter(genre => preferredGenres.includes(genre)),

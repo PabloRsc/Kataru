@@ -7,6 +7,7 @@ create table if not exists public.anime_collection (
   mal_id bigint not null,
   title text not null,
   title_english text,
+  title_aliases text[] not null default '{}',
   display_title text,
   image_url text,
   synopsis text,

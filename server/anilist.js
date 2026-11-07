@@ -98,7 +98,7 @@ const MAL_GENRE_NAME_BY_ID = {
 };
 
 const normalizeGenreName = value => String(value || '')
-  .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').trim().toLowerCase();
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 
 const MAL_GENRE_ID_BY_NAME = Object.fromEntries(
   Object.entries(MAL_GENRE_NAME_BY_ID).map(([id, name]) => [normalizeGenreName(name), Number(id)])

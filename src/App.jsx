@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft,
+  AlertCircle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft,
   ChevronRight, Clapperboard, Clock3, Compass, Filter, Grid2X2, Heart, Home,
   Library, List, ListPlus, LoaderCircle, LogOut, MoreHorizontal, Pencil, Plus,
   Search, Settings2, SlidersHorizontal, Sparkles, Star, Trash2, Trophy, Tv,
@@ -770,7 +770,7 @@ export default function App() {
         />
       )}
 
-      {toast && <div className={'toast' + (/could not find|schema cache|não foi possível|erro|falha/i.test(toast) ? ' toast-error' : '')}><Check size={16} /><span>{toast}</span>{toastAction && <button type="button" disabled={toastActionBusy} onClick={async () => {
+      {toast && <div className={'toast' + (/could not find|schema cache|não foi possível|erro|falha|ainda não foram habilitadas|ainda não estão configuradas|banco .*desatualizado/i.test(toast) ? ' toast-error' : '')}>{/could not find|schema cache|não foi possível|erro|falha|ainda não foram habilitadas|ainda não estão configuradas|banco .*desatualizado/i.test(toast) ? <AlertCircle size={16} /> : <Check size={16} />}<span>{toast}</span>{toastAction && <button type="button" disabled={toastActionBusy} onClick={async () => {
         if (!toastAction || toastActionBusy) return;
         setToastActionBusy(true);
         await toastAction();

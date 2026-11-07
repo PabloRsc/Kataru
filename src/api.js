@@ -1,5 +1,9 @@
 const BASE = '/api/anime';
 
+const catalogEntries = payload => Array.isArray(payload?.data)
+  ? payload.data
+  : Array.isArray(payload) ? payload : [];
+
 async function request(path) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 22000);
@@ -10,7 +14,7 @@ async function request(path) {
     if (!response.ok) {
       throw new Error(payload.message || (response.status === 504
         ? 'O catálogo demorou demais para responder. Tente novamente.'
-        : 'Não foi possível consultar o catálogo de animes agora.'));
+        : `O serviço de catálogo respondeu com HTTP ${response.status}.`));
     }
     return payload;
   } catch (error) {
@@ -22,9 +26,14 @@ async function request(path) {
   }
 }
 
+async function requestCatalog(path) {
+  const data = await request(path);
+  return catalogEntries(data).map(normalizeAnime);
+}
+
 export async function searchAnime(query) {
   const data = await request('/search?q=' + encodeURIComponent(query));
-  return (data.data || []).map(normalizeAnime);
+  return catalogEntries(data).map(normalizeAnime);
 }
 
 export async function fetchAnime(malId) {
@@ -32,27 +41,37 @@ export async function fetchAnime(malId) {
   return normalizeAnime(data.data || data);
 }
 
-export async function discoverAnime(kind = 'current') {
+export async function discoverAnime(kind = 'season') {
   let path;
-  if (kind === 'current') path = '/api/catalog/seasons/now?limit=24&sfw=true';
-  else if (kind === 'upcoming') path = '/api/catalog/seasons/upcoming?limit=24&sfw=true';
-  else if (kind === 'popular') path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24';
-  else if (String(kind).startsWith('genre-')) {
-    const id = Number(String(kind).slice(6));
-    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Gênero inválido.');
-    path = '/api/catalog/anime?genres=' + id + '&order_by=popularity&sort=asc&limit=24&sfw=true';
-  } else path = '/api/catalog/seasons/now?limit=24&sfw=true';
+  if (kind === 'season') {
+    path = '/api/catalog/seasons/now?filter=tv&limit=24&sfw=true';
+  } else if (kind === 'upcoming') {
+    path = '/api/catalog/seasons/upcoming?filter=tv&limit=24&sfw=true';
+  } else if (kind === 'popular') {
+    path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
+  } else if (kind === 'top-rated') {
+    path = '/api/catalog/top/anime?type=tv&limit=24&sfw=true&ranking=score';
+  } else if (String(kind).startsWith('genre-')) {
+    const genre = decodeURIComponent(String(kind).slice(6)).trim();
+    if (!genre) throw new Error('Escolha um gênero para continuar.');
+    path = '/api/catalog/anime?genre=' + encodeURIComponent(genre) + '&order_by=popularity&sort=asc&limit=24&sfw=true';
+  } else {
+    path = '/api/catalog/seasons/now?filter=tv&limit=24&sfw=true';
+  }
 
-  const data = await request(path);
-  return (data.data || []).map(normalizeAnime);
+  return requestCatalog(path);
 }
 
 export async function fetchAnimeGenres() {
-  const data = await request('/api/catalog/genres/anime?filter=genres');
-  return (data.data || []).map(genre => ({ mal_id: genre.mal_id, name: genre.name }))
-    .filter(genre => genre.mal_id && genre.name);
+  const entries = await request('/api/catalog/genres/anime?filter=genres');
+  return catalogEntries(entries).map(genre => ({
+    mal_id: Number.isSafeInteger(Number(genre.mal_id)) ? Number(genre.mal_id) : null,
+    name: genre.name,
+    count: Number.isFinite(Number(genre.count)) && Number(genre.count) > 0 ? Number(genre.count) : null
+  })).filter(genre => genre.name);
 }
 
+// The catalogue is fetched on demand; it only enters the collection after an explicit add action.
 export function normalizeAnime(a = {}) {
   return {
     mal_id: a.mal_id,
@@ -61,10 +80,12 @@ export function normalizeAnime(a = {}) {
     image_url: a.images?.webp?.large_image_url || a.images?.webp?.image_url || a.images?.jpg?.large_image_url || a.images?.jpg?.image_url || '',
     synopsis: a.synopsis || '',
     episodes_total: a.episodes ?? null,
+    episodes_available: a.episodes_available ?? null,
     airing_status: a.status || null,
     year: a.year || a.aired?.prop?.from?.year || a.year_season || null,
     season: a.season || null,
     genres: (a.genres || []).map(g => typeof g === 'string' ? g : g.name).filter(Boolean),
+    studios: (a.studios || []).map(studio => typeof studio === 'string' ? studio : studio.name).filter(Boolean),
     score_external: a.score || null,
     format: a.type || '',
     api_synced_at: new Date().toISOString()

@@ -99,11 +99,11 @@ function sameAnimeEntry(left, right) {
   const rightAliases = getAnimeAliases(right).map(normalizeAnimeTitle).filter(Boolean);
   if (!rightAliases.some(alias => leftAliases.has(alias))) return false;
 
-  // With matching release metadata, a shared official/alternate title is sufficient.
+  // Matching year/season and at least one official alias identify the same release.
   if (leftYear && rightYear && leftYear === rightYear) return true;
-  if (leftYear && rightYear && leftYear === rightYear && leftSeason && rightSeason && leftSeason === rightSeason) return true;
+  if (leftSeason && rightSeason && leftSeason === rightSeason) return true;
 
-  // If one side has incomplete metadata, only accept an exact primary-title match.
+  // If release metadata is incomplete, only accept an exact primary-title match.
   const leftPrimary = normalizeAnimeTitle(left.title || left.display_title);
   const rightPrimary = normalizeAnimeTitle(right.title || right.display_title);
   return Boolean(leftPrimary && leftPrimary === rightPrimary);
@@ -419,6 +419,14 @@ export default function App() {
   }
 
   function startAdd(result, initialStatus = 'planned') {
+    const alreadySaved = items.find(item => sameAnimeEntry(item, result));
+    if (alreadySaved) {
+      setSearchOpen(false);
+      setSelected(alreadySaved);
+      setPendingListId(null);
+      notify('Este anime já está na sua biblioteca.');
+      return;
+    }
     const anime = {
       ...result,
       id: String(result.mal_id),

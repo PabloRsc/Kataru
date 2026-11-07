@@ -37,9 +37,16 @@ Sem variáveis Supabase, o app permanece em modo local para desenvolvimento. Os 
 3. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
 4. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para os ambientes local e publicado.
 5. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
-6. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
+6. Se estiver atualizando um projeto que já tem as tabelas da coleção, execute também **supabase/auth-profiles-setup.sql** para criar a tabela de perfis e a verificação segura de nomes de usuário (essa configuração já foi aplicada no projeto Supabase conectado ao Kataru).
+7. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
 
-A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha ou Google (quando o provedor estiver habilitado), confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. Com Supabase configurado, a coleção exige sessão autenticada.
+A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha, opção Google, confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. Com Supabase configurado, a coleção exige sessão autenticada.
+
+**Google OAuth:** o código já inicia o fluxo, mas é necessário habilitar Google em Authentication → Providers, inserir o OAuth Client ID/Secret do Google Cloud e cadastrar o callback do Supabase no Google Cloud. A URL de retorno do site também deve estar na lista de Redirect URLs do Supabase.
+
+**Recuperação e confirmação:** em Authentication → URL Configuration, autorize o domínio publicado, os previews usados para testes e o endereço local (http://localhost:5173). O link de recuperação retorna à raiz do Kataru para que o Supabase entregue o evento de redefinição de senha.
+
+Os links de Termos e Privacidade estão previstos no formulário; os destinos e textos jurídicos finais ainda precisam ser fornecidos antes da publicação comercial.
 
 ### Atualizar uma instalação Supabase existente
 

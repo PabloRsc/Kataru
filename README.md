@@ -8,7 +8,7 @@ A navegação está organizada em quatro áreas:
 
 - **Início:** anime em andamento, progresso rápido e prateleiras de títulos assistidos e planejados.
 - **Biblioteca:** visualização em grade ou lista, busca, filtros por status, gênero, ano, formato e nota, além de ordenação.
-- **Descobrir:** temporada atual, títulos populares, próximos lançamentos e navegação por gêneros. Não inclui calendário de lançamentos.
+- **Descobrir:** títulos em alta, mais bem avaliados e navegação por gêneros, com capas e inclusão manual na biblioteca. Não inclui calendário de lançamentos.
 - **Listas:** listas automáticas por status e listas temáticas criadas pelo usuário.
 
 Os detalhes de cada anime incluem status, progresso por episódio, avaliação pessoal por estrelas, anotações, datas, reassistidas e informações do catálogo. A edição permite ajustar título exibido e total de episódios manualmente, além de adicionar um título sem catálogo.
@@ -59,7 +59,7 @@ Não execute essa migração em um banco vazio como substituto de **schema.sql**
 
 A pesquisa e atualização manual passam por funções serverless da Vercel (/api/anime). A fonte principal é a Jikan API; se ela falhar, o servidor consulta a AniList GraphQL como alternativa. Os dois provedores são normalizados para o formato usado pela coleção. Quando a Jikan não informa episódios de séries em lançamento, o Kataru tenta enriquecer a contagem com a AniList.
 
-A área Descobrir consulta temporada atual, próximos lançamentos, títulos populares e gêneros sob demanda. A Jikan é a fonte principal; se uma consulta falhar, a função serverless tenta a AniList GraphQL como alternativa. Os títulos encontrados permanecem apenas no catálogo externo e só entram em anime_collection quando o usuário escolhe adicioná-los à biblioteca. No desenvolvimento local, o Vite encaminha as rotas de catálogo para a Jikan.
+A área Descobrir consulta títulos populares, mais bem avaliados e gêneros sob demanda. A Jikan é a fonte principal; se uma consulta falhar ou retornar uma lista vazia, a função serverless tenta a AniList GraphQL como alternativa. A categoria de mais bem avaliados também aplica a ordenação por nota na fonte alternativa. Os títulos encontrados permanecem apenas no catálogo externo e só entram em anime_collection quando o usuário escolhe adicioná-los à biblioteca. No desenvolvimento local, o Vite encaminha as rotas de catálogo para a Jikan.
 
 ## Build
 

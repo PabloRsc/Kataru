@@ -13,7 +13,7 @@ A estrutura foi reorganizada de acordo com os mockups enviados:
 - Navegação principal: Início, Biblioteca, Descobrir e Listas.
 - Início com anime em andamento, ação rápida de episódio e prateleiras Assistindo, Assistidos recentemente e Quero assistir.
 - Biblioteca em grade/lista, busca, status, filtros por gênero/ano/formato/nota e ordenação.
-- Descobrir com temporada atual, populares, próximos lançamentos e gêneros.
+- Descobrir com títulos em alta, mais bem avaliados e navegação por gêneros.
 - Detalhes com status, progresso, avaliação por estrelas, anotações, datas, reassistidas e metadados.
 - Fluxos de adição/edição e adição manual de título.
 - Listas automáticas por status e listas personalizadas.
@@ -24,7 +24,7 @@ A estrutura foi reorganizada de acordo com os mockups enviados:
 
 - Aplicação React + Vite.
 - Pesquisa e detalhes de catálogo via funções serverless da Vercel, Jikan como fonte principal e AniList como fallback.
-- Endpoint serverless para temporada atual, próximos lançamentos, populares e gêneros na área Descobrir, com Jikan como fonte principal e fallback AniList em caso de falha.
+- Endpoint serverless para títulos populares, mais bem avaliados e gêneros na área Descobrir, com Jikan como fonte principal e fallback AniList em caso de erro ou resposta vazia.
 - Página de Descobrir com categorias explicadas, consulta por gênero e inclusão explícita dos títulos na biblioteca.
 - Biblioteca com filtros, ordenação e alternância grade/lista.
 - Progresso de episódios, status, nota, datas, reassistidas, título de exibição, total manual e anotações.

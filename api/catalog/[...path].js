@@ -15,6 +15,21 @@ function sendCatalogResult(res, payload, source) {
   return res.status(200).json(payload);
 }
 
+function hasCatalogEntries(payload) {
+  return Array.isArray(payload?.data) && payload.data.length > 0;
+}
+
+async function sendAniListFallback(res, route, params) {
+  try {
+    const fallback = await discoverAniList(route, params);
+    return sendCatalogResult(res, fallback, 'anilist-fallback');
+  } catch (error) {
+    error.status = 502;
+    error.message = 'Não foi possível consultar Jikan nem AniList para esta categoria. Tente novamente em instantes.';
+    return sendApiError(res, error);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -40,6 +55,7 @@ export default async function handler(req, res) {
   const genreName = params.get('genre') || getAnimeGenreName(params.get('genres'));
   const jikanParams = new URLSearchParams(params);
   jikanParams.delete('genre');
+  jikanParams.delete('ranking');
 
   if (route === 'anime' && genreName && !jikanParams.has('genres')) {
     const genreId = getAnimeGenreId(genreName);
@@ -48,25 +64,22 @@ export default async function handler(req, res) {
 
   // If the name is not supported by Jikan, do not return an unfiltered list.
   if (route === 'anime' && genreName && !jikanParams.has('genres')) {
-    try {
-      return sendCatalogResult(res, await discoverAniList(route, params), 'anilist-fallback');
-    } catch (error) {
-      return sendApiError(res, error);
-    }
+    return sendAniListFallback(res, route, params);
   }
 
   const query = jikanParams.toString();
+  let primaryPayload;
   try {
     const result = await requestJikan('/' + route + (query ? '?' + query : ''));
-    return sendCatalogResult(res, result.data, 'jikan');
-  } catch (jikanError) {
-    try {
-      const fallback = await discoverAniList(route, params);
-      return sendCatalogResult(res, fallback, 'anilist-fallback');
-    } catch (fallbackError) {
-      fallbackError.status = 502;
-      fallbackError.message = 'Não foi possível consultar Jikan nem AniList para esta categoria. Tente novamente em instantes.';
-      return sendApiError(res, fallbackError);
-    }
+    primaryPayload = result.data;
+  } catch {
+    return sendAniListFallback(res, route, params);
   }
+
+  // A successful HTTP response can still contain no usable data. In that
+  // case, try the alternative provider instead of showing an empty catalogue.
+  if (hasCatalogEntries(primaryPayload)) {
+    return sendCatalogResult(res, primaryPayload, 'jikan');
+  }
+  return sendAniListFallback(res, route, params);
 }

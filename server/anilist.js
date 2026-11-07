@@ -160,7 +160,8 @@ export async function discoverAniList(route, params = new URLSearchParams()) {
     throw new Error('Categoria de catálogo não suportada pela fonte alternativa.');
   }
 
-  filters.push('sort: [POPULARITY_DESC]');
+  const rankingSort = params.get('ranking') === 'score' ? 'SCORE_DESC' : 'POPULARITY_DESC';
+  filters.push('sort: [' + rankingSort + ']');
   const query = 'query (' + variableDefinitions.join(', ') + ') { Page(page: $page, perPage: $perPage) {' +
     ' pageInfo { hasNextPage currentPage total } media(' + filters.join(', ') + ') {' + MEDIA_FIELDS + ' } } }';
   const data = await queryAniList(query, variables);

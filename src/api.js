@@ -1,5 +1,9 @@
 const BASE = '/api/anime';
 
+const catalogEntries = payload => Array.isArray(payload?.data)
+  ? payload.data
+  : Array.isArray(payload) ? payload : [];
+
 async function request(path) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 22000);
@@ -24,7 +28,7 @@ async function request(path) {
 
 export async function searchAnime(query) {
   const data = await request('/search?q=' + encodeURIComponent(query));
-  return (data.data || []).map(normalizeAnime);
+  return catalogEntries(data).map(normalizeAnime);
 }
 
 export async function fetchAnime(malId) {
@@ -32,24 +36,23 @@ export async function fetchAnime(malId) {
   return normalizeAnime(data.data || data);
 }
 
-export async function discoverAnime(kind = 'current') {
+export async function discoverAnime(kind = 'popular') {
   let path;
-  if (kind === 'current') path = '/api/catalog/seasons/now?limit=24&sfw=true';
-  else if (kind === 'upcoming') path = '/api/catalog/seasons/upcoming?limit=24&sfw=true';
-  else if (kind === 'popular') path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24';
+  if (kind === 'popular') path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
+  else if (kind === 'top-rated') path = '/api/catalog/top/anime?type=tv&limit=24&sfw=true&ranking=score';
   else if (String(kind).startsWith('genre-')) {
     const genre = decodeURIComponent(String(kind).slice(6)).trim();
     if (!genre) throw new Error('Escolha um gênero para continuar.');
     path = '/api/catalog/anime?genre=' + encodeURIComponent(genre) + '&order_by=popularity&sort=asc&limit=24&sfw=true';
-  } else path = '/api/catalog/seasons/now?limit=24&sfw=true';
+  } else path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
 
   const data = await request(path);
-  return (data.data || []).map(normalizeAnime);
+  return catalogEntries(data).map(normalizeAnime);
 }
 
 export async function fetchAnimeGenres() {
   const data = await request('/api/catalog/genres/anime?filter=genres');
-  return (data.data || []).map(genre => ({
+  return catalogEntries(data).map(genre => ({
     mal_id: Number.isSafeInteger(Number(genre.mal_id)) ? Number(genre.mal_id) : null,
     name: genre.name
   })).filter(genre => genre.name);

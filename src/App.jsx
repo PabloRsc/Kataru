@@ -32,9 +32,8 @@ const EMPTY_FORM = {
 };
 
 const DISCOVER_TABS = [
-  { id: 'current', label: 'Temporada atual' },
   { id: 'popular', label: 'Em alta' },
-  { id: 'upcoming', label: 'Próximos lançamentos' },
+  { id: 'top-rated', label: 'Mais bem avaliados' },
   { id: 'genres', label: 'Gêneros' }
 ];
 
@@ -103,7 +102,7 @@ export default function App() {
   const [toastActionBusy, setToastActionBusy] = useState(false);
   const toastTimerRef = useRef(null);
   const [loading, setLoading] = useState(true);
-  const [discoverTab, setDiscoverTab] = useState('current');
+  const [discoverTab, setDiscoverTab] = useState('popular');
   const [discoverResults, setDiscoverResults] = useState([]);
   const [discoverGenres, setDiscoverGenres] = useState([]);
   const [discoverGenre, setDiscoverGenre] = useState(null);
@@ -1053,18 +1052,16 @@ function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGe
     .filter(anime => anime._matchScore > 0)
     .sort((a, b) => b._matchScore - a._matchScore || Number(b.score_external || 0) - Number(a.score_external || 0))
     .slice(0, 4);
-  const title = tab === 'popular' ? 'Em alta no catálogo' : tab === 'upcoming' ? 'Próximos lançamentos' : tab === 'genre' ? selectedGenre?.name || 'Gênero' : 'Temporada atual';
+  const title = tab === 'popular' ? 'Em alta no catálogo' : tab === 'top-rated' ? 'Mais bem avaliados' : tab === 'genre' ? selectedGenre?.name || 'Gênero' : 'Catálogo';
   const feature = results[0];
   const gridResults = feature ? results.slice(1) : results;
-  const categoryDescription = tab === 'current'
-    ? 'Animes que fazem parte da temporada atual de lançamentos. As temporadas mudam a cada três meses.'
-    : tab === 'popular'
-      ? 'Títulos populares no catálogo, independentemente de quando foram lançados.'
-      : tab === 'upcoming'
-        ? 'Animes anunciados para a próxima temporada, que ainda não começaram a ser exibidos. As datas podem mudar.'
-        : tab === 'genre'
-          ? 'Títulos classificados no gênero ' + (selectedGenre?.name || '') + '.'
-          : 'Explore o catálogo por estilos como ação, comédia, fantasia, romance e mistério.';
+  const categoryDescription = tab === 'popular'
+    ? 'Animes populares entre os títulos mais procurados do catálogo.'
+    : tab === 'top-rated'
+      ? 'Animes com as maiores avaliações gerais do catálogo.'
+      : tab === 'genre'
+        ? 'Títulos classificados no gênero ' + (selectedGenre?.name || '') + '.'
+        : 'Explore o catálogo por estilos como ação, comédia, fantasia, romance e mistério.';
 
   return (
     <div className="discover-page">
@@ -1087,7 +1084,7 @@ function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGe
             <>
               {feature && (
                 <section className="discover-feature" style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,17,23,.98) 0%, rgba(15,17,23,.82) 46%, rgba(15,17,23,.22) 100%), url("' + (feature.image_url || '') + '")' }}>
-                  <div className="feature-copy"><span className="feature-tag"><Sparkles size={12} /> {tab === 'upcoming' ? 'CHEGANDO EM BREVE' : tab === 'popular' ? 'MAIS POPULARES' : 'DESTAQUE DA TEMPORADA'}</span><h2>{displayTitle(feature)}</h2><p>{feature.synopsis || 'Uma nova história para adicionar à sua lista.'}</p><div className="feature-meta"><span>{feature.year || 'Ano não informado'}</span>{feature.format && <><i>·</i><span>{feature.format}</span></>}{feature.score_external && <><i>·</i><span><Star size={12} fill="currentColor" />{Number(feature.score_external).toFixed(1)}</span></>}</div><div className="hero-actions"><button className="primary-button" onClick={() => onOpenAnime(feature)}><Plus size={15} />{isInCollection(feature) ? 'Ver na biblioteca' : 'Quero assistir'}</button></div></div>
+                  <div className="feature-copy"><span className="feature-tag"><Sparkles size={12} /> {tab === 'top-rated' ? 'MAIS BEM AVALIADOS' : tab === 'popular' ? 'EM ALTA' : 'GÊNERO EM DESTAQUE'}</span><h2>{displayTitle(feature)}</h2><p>{feature.synopsis || 'Uma nova história para adicionar à sua lista.'}</p><div className="feature-meta"><span>{feature.year || 'Ano não informado'}</span>{feature.format && <><i>·</i><span>{feature.format}</span></>}{feature.score_external && <><i>·</i><span><Star size={12} fill="currentColor" />{Number(feature.score_external).toFixed(1)}</span></>}</div><div className="hero-actions"><button className="primary-button" onClick={() => onOpenAnime(feature)}><Plus size={15} />{isInCollection(feature) ? 'Ver na biblioteca' : 'Quero assistir'}</button></div></div>
                 </section>
               )}
               {recommendations.length > 0 && (
@@ -1145,12 +1142,12 @@ function ListsPage({ items, lists, counts, onOpenStatus, onOpenList, onNewList, 
       <section className="list-section">
         <div className="section-heading"><div><h2>Automáticas por status</h2><p>Geradas a partir da sua biblioteca.</p></div><span className="automatic-label"><Zap size={12} /> AUTOMÁTICAS</span></div>
         <div className="automatic-grid">{automatic.map(entry => {
-          const covers = items.filter(anime => anime.status === entry.id).sort(sortByRecent).slice(0, 4);
+          const covers = items.filter(anime => anime.status === entry.id).sort(sortByRecent).slice(0, 3);
           return <button key={entry.id} className={'automatic-card tone-' + statusTone(entry.id)} onClick={() => onOpenStatus(entry.id)}>
-            <div className="list-cover-grid automatic-cover-grid">
-              {Array.from({ length: 4 }, (_, index) => {
+            <div className="list-cover-stack" aria-hidden="true">
+              {Array.from({ length: 3 }, (_, index) => {
                 const anime = covers[index];
-                return <div className={anime?.image_url ? 'list-cover-item' : 'list-cover-item is-empty'} key={index}>
+                return <div className={anime?.image_url ? 'list-cover-card' : 'list-cover-card is-empty'} key={index}>
                   {anime?.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <span><ListPlus size={20} /></span>}
                 </div>;
               })}
@@ -1163,13 +1160,13 @@ function ListsPage({ items, lists, counts, onOpenStatus, onOpenList, onNewList, 
         <div className="section-heading"><div><h2>Minhas listas</h2><p>Crie coleções temáticas e reúna seus favoritos.</p></div><span className="catalog-count">{lists.length} listas</span></div>
         {lists.length ? <div className="custom-list-grid">{lists.map(list => {
           const count = (list.anime_ids || []).length;
-          const covers = (list.anime_ids || []).slice(0, 4).map(id => items.find(anime => String(anime.mal_id) === String(id))).filter(Boolean);
+          const covers = (list.anime_ids || []).slice(0, 3).map(id => items.find(anime => String(anime.mal_id) === String(id))).filter(Boolean);
           return <article className="custom-list-card" key={list.id}>
             <button className="custom-list-open" onClick={() => onOpenList(list)}>
-              <div className="list-cover-grid">
-                {Array.from({ length: 4 }, (_, index) => {
+              <div className="list-cover-stack" aria-hidden="true">
+                {Array.from({ length: 3 }, (_, index) => {
                   const anime = covers[index];
-                  return <div className={anime?.image_url ? 'list-cover-item' : 'list-cover-item is-empty'} key={index}>
+                  return <div className={anime?.image_url ? 'list-cover-card' : 'list-cover-card is-empty'} key={index}>
                     {anime?.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <span><ListPlus size={20} /></span>}
                   </div>;
                 })}

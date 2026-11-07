@@ -13,6 +13,7 @@ create table if not exists public.anime_collection (
   episodes_total integer,
   episodes_total_manual integer,
   episodes_available integer,
+  airing_status text,
   year integer,
   season text,
   format text,

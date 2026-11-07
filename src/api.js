@@ -38,9 +38,9 @@ export async function discoverAnime(kind = 'current') {
   else if (kind === 'upcoming') path = '/api/catalog/seasons/upcoming?limit=24&sfw=true';
   else if (kind === 'popular') path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24';
   else if (String(kind).startsWith('genre-')) {
-    const id = Number(String(kind).slice(6));
-    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Gênero inválido.');
-    path = '/api/catalog/anime?genres=' + id + '&order_by=popularity&sort=asc&limit=24&sfw=true';
+    const genre = decodeURIComponent(String(kind).slice(6)).trim();
+    if (!genre) throw new Error('Escolha um gênero para continuar.');
+    path = '/api/catalog/anime?genre=' + encodeURIComponent(genre) + '&order_by=popularity&sort=asc&limit=24&sfw=true';
   } else path = '/api/catalog/seasons/now?limit=24&sfw=true';
 
   const data = await request(path);
@@ -49,9 +49,12 @@ export async function discoverAnime(kind = 'current') {
 
 export async function fetchAnimeGenres() {
   const data = await request('/api/catalog/genres/anime?filter=genres');
-  return (data.data || []).map(genre => ({ mal_id: genre.mal_id, name: genre.name }))
-    .filter(genre => genre.mal_id && genre.name);
+  return (data.data || []).map(genre => ({
+    mal_id: Number.isSafeInteger(Number(genre.mal_id)) ? Number(genre.mal_id) : null,
+    name: genre.name
+  })).filter(genre => genre.name);
 }
+// The catalogue is fetched on demand; it only enters the collection after an explicit add action.
 
 export function normalizeAnime(a = {}) {
   return {

@@ -59,7 +59,7 @@ Não execute essa migração em um banco vazio como substituto de **schema.sql**
 
 A pesquisa e atualização manual passam por funções serverless da Vercel (/api/anime). A fonte principal é a Jikan API; se ela falhar, o servidor consulta a AniList GraphQL como alternativa. Os dois provedores são normalizados para o formato usado pela coleção. Quando a Jikan não informa episódios de séries em lançamento, o Kataru tenta enriquecer a contagem com a AniList.
 
-A área Descobrir usa endpoints da Jikan para temporada atual, próximos lançamentos, títulos populares e gêneros. No desenvolvimento local, o Vite encaminha as rotas de catálogo e descoberta para a Jikan. A alternativa AniList é executada nas funções serverless da Vercel.
+A área Descobrir consulta temporada atual, próximos lançamentos, títulos populares e gêneros sob demanda. A Jikan é a fonte principal; se uma consulta falhar, a função serverless tenta a AniList GraphQL como alternativa. Os títulos encontrados permanecem apenas no catálogo externo e só entram em anime_collection quando o usuário escolhe adicioná-los à biblioteca. No desenvolvimento local, o Vite encaminha as rotas de catálogo para a Jikan.
 
 ## Build
 

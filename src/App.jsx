@@ -88,6 +88,7 @@ export default function App() {
   const [ratingFilter, setRatingFilter] = useState('');
   const [gridMode, setGridMode] = useState('grid');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchMode, setSearchMode] = useState('add');
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -114,6 +115,42 @@ export default function App() {
   const [listForm, setListForm] = useState({ name: '', description: '', is_ranked: false });
   const [listSaving, setListSaving] = useState(false);
   const [pendingListId, setPendingListId] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    if (!supabase) return undefined;
+    let mounted = true;
+    supabase.auth.getUser()
+      .then(({ data }) => { if (mounted) setAuthUser(data?.user || null); })
+      .catch(() => {});
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user || null);
+    });
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+    const closeOnPointer = event => {
+      if (!profileRef.current?.contains(event.target)) setProfileOpen(false);
+    };
+    const closeOnEscape = event => { if (event.key === 'Escape') setProfileOpen(false); };
+    document.addEventListener('pointerdown', closeOnPointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [profileOpen]);
+
+  useEffect(() => {
+    if (!searchOpen) setSearchMode('add');
+  }, [searchOpen]);
 
   useEffect(() => {
     let mounted = true;
@@ -166,7 +203,9 @@ export default function App() {
         .catch(error => { if (active) setDiscoverError(error.message || 'Não foi possível carregar os gêneros.'); })
         .finally(() => { if (active) setDiscoverLoading(false); });
     } else {
-      const kind = discoverTab === 'genre' && discoverGenre ? 'genre-' + discoverGenre.mal_id : discoverTab;
+      const kind = discoverTab === 'genre' && discoverGenre
+        ? 'genre-' + encodeURIComponent(discoverGenre.name || discoverGenre.mal_id || '')
+        : discoverTab;
       discoverAnime(kind)
         .then(data => { if (active) setDiscoverResults(data || []); })
         .catch(error => { if (active) setDiscoverError(error.message || 'Não foi possível carregar o catálogo.'); })
@@ -594,21 +633,46 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <button className="brand" onClick={() => navigate('home')} aria-label="Kataru — início">
-          <span className="brand-mark"><KataruMark size={25} /></span>
           <span className="brand-name">kataru<span>.</span></span>
         </button>
         <nav className="main-nav" aria-label="Navegação principal">
-          <button className={page === 'home' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('home')}><Home size={15} />Início</button>
-          <button className={page === 'library' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('library')}><Library size={15} />Biblioteca</button>
-          <button className={page === 'discover' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('discover')}><Compass size={15} />Descobrir</button>
-          <button className={page === 'lists' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('lists')}><ListPlus size={15} />Listas</button>
+          <button className={page === 'home' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('home')}>Início</button>
+          <button className={page === 'library' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('library')}>Biblioteca</button>
+          <button className={page === 'discover' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('discover')}>Descobrir</button>
+          <button className={page === 'lists' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('lists')}>Listas</button>
         </nav>
         <div className="topbar-actions">
-          <button className="global-search" onClick={() => setSearchOpen(true)}><Search size={16} /><span>Buscar</span><kbd>/</kbd></button>
-          <button className="primary-button top-add" onClick={() => { setSearchOpen(true); setSearchQuery(''); setResults([]); }}><Plus size={16} />Adicionar anime</button>
-          {storageMode === 'supabase' && (
-            <button className="account-button" title="Sair da conta" aria-label="Sair da conta" onClick={async () => { await supabase.auth.signOut(); }}><LogOut size={16} /></button>
-          )}
+          <button className="global-search" aria-label="Buscar animes e estúdios" onClick={() => {
+            setSearchMode('global'); setSearchOpen(true); setSearchQuery(''); setResults([]);
+          }}><Search size={16} /><span>Buscar animes, estúdios...</span></button>
+          <button className="primary-button top-add" onClick={() => {
+            setSearchMode('add'); setSearchOpen(true); setSearchQuery(''); setResults([]);
+          }}><Plus size={16} />Adicionar anime</button>
+          <div className="profile-menu" ref={profileRef}>
+            <button className="profile-trigger" aria-label="Abrir perfil e conta" aria-expanded={profileOpen} onClick={() => setProfileOpen(open => !open)}>
+              <span className="profile-avatar">
+                {(authUser?.user_metadata?.avatar_url || authUser?.user_metadata?.picture)
+                  ? <img src={authUser.user_metadata.avatar_url || authUser.user_metadata.picture} alt="" />
+                  : getInitials(authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email || 'K')}
+              </span>
+              <span className="profile-copy">
+                <strong>{authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
+                <small>{authUser?.email || 'Dados salvos neste navegador'}</small>
+              </span>
+              <ChevronDown className="profile-chevron" size={14} />
+            </button>
+            {profileOpen && <div className="profile-dropdown" role="menu">
+              <div className="profile-dropdown-user">
+                <strong>{authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
+                <span>{authUser?.email || 'Seus dados ficam salvos neste navegador.'}</span>
+              </div>
+              {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={async () => {
+                setProfileOpen(false);
+                const { error } = await supabase.auth.signOut();
+                if (error) notify(error.message || 'Não foi possível sair da conta.');
+              }}><LogOut size={15} />Sair da conta</button>}
+            </div>}
+          </div>
         </div>
       </header>
 
@@ -636,7 +700,7 @@ export default function App() {
             onOpenAnime={setSelected}
             onRemoveAnime={anime => removeAnimeFromList(activeList, anime)}
             onMoveAnime={(anime, direction) => moveAnimeInList(activeList, anime, direction)}
-            onAdd={() => { setPendingListId(activeList.id); setSearchOpen(true); setSearchQuery(''); setResults([]); }}
+            onAdd={() => { setPendingListId(activeList.id); setSearchMode('add'); setSearchOpen(true); setSearchQuery(''); setResults([]); }}
           />
         ) : page === 'home' ? (
           <HomePage
@@ -729,6 +793,7 @@ export default function App() {
         <SearchModal
           query={searchQuery}
           setQuery={setSearchQuery}
+          searchMode={searchMode}
           results={results}
           searching={searching}
           error={searchError}
@@ -742,6 +807,7 @@ export default function App() {
               setSearchOpen(false);
             } else startAdd(result);
           }}
+          onOpenExisting={anime => { setSelected(anime); setSearchOpen(false); }}
           onManual={startManualAdd}
           isInCollection={isInCollection}
           allowExisting={Boolean(pendingListId)}
@@ -828,9 +894,10 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
           <p>Acompanhe suas histórias favoritas e descubra o que assistir depois.</p>
         </div>
         <div className="home-summary">
-          <div><strong>{counts.all}</strong><span>na biblioteca</span></div>
-          <div><strong>{counts.watching || 0}</strong><span>em andamento</span></div>
-          <div><strong>{counts.completed || 0}</strong><span>concluídos</span></div>
+          <div><strong>{counts.completed || 0}</strong><span>assistidos</span></div>
+          <div><strong>{counts.watching || 0}</strong><span>assistindo</span></div>
+          <div><strong>{counts.planned || 0}</strong><span>quero assistir</span></div>
+          <div><strong>{counts.dropped || 0}</strong><span>abandonados</span></div>
         </div>
       </div>
 
@@ -874,10 +941,6 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
           {!items.length && <div className="empty-home-note"><BookOpen size={18} /><span>Quando adicionar animes, sua atividade aparecerá aqui.</span></div>}
         </>
       )}
-      <section className="discover-promo">
-        <div><span className="eyebrow">SEMPRE TEM ALGO NOVO</span><h3>Não sabe o que assistir agora?</h3><p>Explore títulos em alta e encontre uma nova história para acompanhar.</p></div>
-        <button className="outline-button" onClick={() => onNavigate('discover')}>Ir para Descobrir <ArrowRight size={15} /></button>
-      </section>
     </div>
   );
 }
@@ -990,20 +1053,31 @@ function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGe
     .filter(anime => anime._matchScore > 0)
     .sort((a, b) => b._matchScore - a._matchScore || Number(b.score_external || 0) - Number(a.score_external || 0))
     .slice(0, 4);
-  const title = tab === 'popular' ? 'Em alta nesta temporada' : tab === 'upcoming' ? 'Próximos lançamentos' : tab === 'genre' ? selectedGenre?.name || 'Gênero' : 'Temporada atual';
+  const title = tab === 'popular' ? 'Em alta no catálogo' : tab === 'upcoming' ? 'Próximos lançamentos' : tab === 'genre' ? selectedGenre?.name || 'Gênero' : 'Temporada atual';
   const feature = results[0];
+  const gridResults = feature ? results.slice(1) : results;
+  const categoryDescription = tab === 'current'
+    ? 'Animes que fazem parte da temporada atual de lançamentos. As temporadas mudam a cada três meses.'
+    : tab === 'popular'
+      ? 'Títulos populares no catálogo, independentemente de quando foram lançados.'
+      : tab === 'upcoming'
+        ? 'Animes anunciados para a próxima temporada, que ainda não começaram a ser exibidos. As datas podem mudar.'
+        : tab === 'genre'
+          ? 'Títulos classificados no gênero ' + (selectedGenre?.name || '') + '.'
+          : 'Explore o catálogo por estilos como ação, comédia, fantasia, romance e mistério.';
 
   return (
     <div className="discover-page">
       <PageIntro eyebrow="EXPLORE NOVAS HISTÓRIAS" title="Descobrir" subtitle="Encontre seu próximo anime favorito." />
       <div className="discover-tabs">{DISCOVER_TABS.map(item => <button key={item.id} className={tab === item.id || (tab === 'genre' && item.id === 'genres') ? 'discover-tab active' : 'discover-tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
+      <p className="discover-category-description">{categoryDescription}</p>
 
       {tab === 'genres' ? (
         <>
           <div className="discover-section-heading"><div><h2>Explore por gênero</h2><p>Escolha um estilo e descubra novos títulos.</p></div></div>
           <label className="search-field genre-search"><Search size={16} /><input value={genreQuery} onChange={event => setGenreQuery(event.target.value)} placeholder="Buscar gênero" /></label>
           {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando gêneros...</div> : error ? <CatalogError message={error} onRetry={onRetry} /> : (
-            <div className="genre-grid">{shownGenres.map(genre => <button key={genre.mal_id} className="genre-card" onClick={() => onSelectGenre(genre)}><span>{genre.name}</span><ArrowUpRightIcon /></button>)}</div>
+            <div className="genre-grid">{shownGenres.map(genre => <button key={genre.name || genre.mal_id} className="genre-card" onClick={() => onSelectGenre(genre)}><span>{genre.name}</span><ArrowUpRightIcon /></button>)}</div>
           )}
         </>
       ) : (
@@ -1022,8 +1096,8 @@ function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGe
                   <div className="discover-grid personalized-grid">{recommendations.map(anime => <DiscoverCard key={'recommended-' + anime.mal_id} anime={anime} exists={false} onOpen={() => onOpenAnime(anime)} onAdd={() => onAdd(anime)} />)}</div>
                 </section>
               )}
-              <div className="section-heading discover-results-heading"><div><h2>{title}</h2><p>{tab === 'upcoming' ? 'Histórias que estão a caminho.' : 'Títulos que estão chamando atenção.'}</p></div><span className="catalog-count">{results.length} títulos</span></div>
-              {results.length ? <div className="discover-grid">{results.map(anime => <DiscoverCard key={anime.mal_id} anime={anime} exists={isInCollection(anime)} onOpen={() => onOpenAnime(anime)} onAdd={() => onAdd(anime)} />)}</div> : <div className="empty-state"><h2>Nenhum título encontrado</h2><p>O catálogo não retornou resultados para esta seleção.</p></div>}
+              <div className="section-heading discover-results-heading"><div><h2>{title}</h2><p>{categoryDescription}</p></div><span className="catalog-count">{results.length} títulos</span></div>
+              {gridResults.length ? <div className="discover-grid">{gridResults.map(anime => <DiscoverCard key={anime.mal_id} anime={anime} exists={isInCollection(anime)} onOpen={() => onOpenAnime(anime)} onAdd={() => onAdd(anime)} />)}</div> : results.length ? null : <div className="empty-state"><h2>Nenhum título encontrado</h2><p>O catálogo não retornou resultados para esta seleção.</p></div>}
             </>
           )}
         </>
@@ -1038,10 +1112,16 @@ function DiscoverCard({ anime, exists, onOpen, onAdd }) {
   return (
     <article className="discover-card">
       <button className="discover-card-main" onClick={onOpen}>
-        <div className="discover-card-art">{anime.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <Clapperboard size={22} />}</div>
-        <div className="discover-card-info"><strong>{displayTitle(anime)}</strong><span>{anime.year || 'Ano não informado'}{anime.format ? ' · ' + anime.format : ''}</span>{anime.score_external && <small><Star size={11} fill="currentColor" /> {Number(anime.score_external).toFixed(1)}</small>}</div>
+        <div className="discover-card-art">{anime.image_url ? <img src={anime.image_url} alt={displayTitle(anime)} loading="lazy" /> : <Clapperboard size={28} />}</div>
+        <div className="discover-card-info">
+          <strong>{displayTitle(anime)}</strong>
+          <span>{anime.year || 'Ano não informado'}{anime.format ? ' · ' + anime.format : ''}</span>
+          {anime.score_external && <small><Star size={11} fill="currentColor" /> {Number(anime.score_external).toFixed(1)}</small>}
+        </div>
       </button>
-      <button className={exists ? 'discover-add added' : 'discover-add'} onClick={onAdd} disabled={exists}>{exists ? <><Check size={13} />Na biblioteca</> : <><Plus size={13} />Adicionar</>}</button>
+      <button className={exists ? 'discover-add added' : 'discover-add'} onClick={onAdd} disabled={exists}>
+        {exists ? <><Check size={13} />Na biblioteca</> : <><Plus size={13} />Adicionar à biblioteca</>}
+      </button>
     </article>
   );
 }
@@ -1064,7 +1144,20 @@ function ListsPage({ items, lists, counts, onOpenStatus, onOpenList, onNewList, 
       <PageIntro eyebrow="ORGANIZE DO SEU JEITO" title="Listas" subtitle="Coleções automáticas e listas criadas por você." action={<button className="primary-button" onClick={onNewList}><Plus size={16} />Nova lista</button>} />
       <section className="list-section">
         <div className="section-heading"><div><h2>Automáticas por status</h2><p>Geradas a partir da sua biblioteca.</p></div><span className="automatic-label"><Zap size={12} /> AUTOMÁTICAS</span></div>
-        <div className="automatic-grid">{automatic.map(entry => <button key={entry.id} className={'automatic-card tone-' + statusTone(entry.id)} onClick={() => onOpenStatus(entry.id)}><span className="automatic-icon">{entry.icon}</span><span className="automatic-copy"><strong>{entry.title}</strong><small>{entry.description}</small></span><span className="automatic-count">{entry.count}</span><ChevronRight size={16} /></button>)}</div>
+        <div className="automatic-grid">{automatic.map(entry => {
+          const covers = items.filter(anime => anime.status === entry.id).sort(sortByRecent).slice(0, 4);
+          return <button key={entry.id} className={'automatic-card tone-' + statusTone(entry.id)} onClick={() => onOpenStatus(entry.id)}>
+            <div className="list-cover-grid automatic-cover-grid">
+              {Array.from({ length: 4 }, (_, index) => {
+                const anime = covers[index];
+                return <div className={anime?.image_url ? 'list-cover-item' : 'list-cover-item is-empty'} key={index}>
+                  {anime?.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <span><ListPlus size={20} /></span>}
+                </div>;
+              })}
+            </div>
+            <div className="custom-list-info"><strong>{entry.title}</strong><span>{entry.count} {entry.count === 1 ? 'anime' : 'animes'} · Automática</span></div>
+          </button>;
+        })}</div>
       </section>
       <section className="list-section custom-lists-section">
         <div className="section-heading"><div><h2>Minhas listas</h2><p>Crie coleções temáticas e reúna seus favoritos.</p></div><span className="catalog-count">{lists.length} listas</span></div>
@@ -1073,8 +1166,15 @@ function ListsPage({ items, lists, counts, onOpenStatus, onOpenList, onNewList, 
           const covers = (list.anime_ids || []).slice(0, 4).map(id => items.find(anime => String(anime.mal_id) === String(id))).filter(Boolean);
           return <article className="custom-list-card" key={list.id}>
             <button className="custom-list-open" onClick={() => onOpenList(list)}>
-              <div className="list-cover-stack">{covers.length ? covers.map((anime, index) => <img key={anime.id} style={{ left: (index * 35) + 'px', zIndex: 5 - index }} src={anime.image_url} alt="" />) : <span><ListPlus size={26} /></span>}</div>
-              <div className="custom-list-info"><strong>{list.name}</strong><small>{list.description || 'Sem descrição'}</small><span>{count} {count === 1 ? 'anime' : 'animes'}{list.is_ranked ? ' · ordem de preferência' : ''}</span></div>
+              <div className="list-cover-grid">
+                {Array.from({ length: 4 }, (_, index) => {
+                  const anime = covers[index];
+                  return <div className={anime?.image_url ? 'list-cover-item' : 'list-cover-item is-empty'} key={index}>
+                    {anime?.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <span><ListPlus size={20} /></span>}
+                  </div>;
+                })}
+              </div>
+              <div className="custom-list-info"><strong>{list.name}</strong><span>{count} {count === 1 ? 'anime' : 'animes'}{list.is_ranked ? ' · Ordem de preferência' : ''}</span></div>
             </button>
             <button className="list-more" onClick={() => onEditList(list)} aria-label="Editar lista"><MoreHorizontal size={18} /></button>
           </article>;
@@ -1187,7 +1287,7 @@ function StarRating({ value, onChange }) {
   return <div className="star-rating" role="group" aria-label="Sua nota de zero a cinco estrelas">{[1, 2, 3, 4, 5].map(star => <button type="button" key={star} className={star <= value ? 'filled' : ''} onClick={() => onChange(star === value ? 0 : star)} aria-label={star + ' estrelas'}><Star size={23} fill={star <= value ? 'currentColor' : 'none'} /></button>)}</div>;
 }
 
-function SearchModal({ query, setQuery, results, searching, error, onSearch, onClose, onAdd, onManual, isInCollection, allowExisting, libraryItems = [], alreadyInListIds = [], targetListName = '' }) {
+function SearchModal({ query, setQuery, searchMode = 'add', results, searching, error, onSearch, onClose, onAdd, onOpenExisting, onManual, isInCollection, allowExisting, libraryItems = [], alreadyInListIds = [], targetListName = '' }) {
   const [formatFilter, setFormatFilter] = useState('all');
   const formatOptions = [
     { id: 'all', label: 'Todos' }, { id: 'TV', label: 'Série (TV)' },
@@ -1195,14 +1295,17 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
   ];
   const normalizedQuery = query.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const alreadyInList = new Set(alreadyInListIds.map(String));
-  const filteredLibrary = allowExisting
-    ? libraryItems
-      .filter(anime => !alreadyInList.has(String(anime.mal_id)))
-      .filter(anime => !normalizedQuery || displayTitle(anime).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(normalizedQuery))
-      .sort((a, b) => sortByRecent(a, b))
-    : [];
+  const showLibrary = allowExisting || searchMode === 'global';
+  const filteredLibrary = showLibrary ? libraryItems
+    .filter(anime => !allowExisting || !alreadyInList.has(String(anime.mal_id)))
+    .filter(anime => {
+      const searchable = (displayTitle(anime) + ' ' + (anime.title_english || '')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      return !normalizedQuery || searchable.includes(normalizedQuery);
+    })
+    .sort((a, b) => sortByRecent(a, b)) : [];
   const visibleLibrary = filteredLibrary.slice(0, 24);
   const filteredResults = results
+    .filter(result => !(searchMode === 'global' && isInCollection(result)))
     .filter(result => formatFilter === 'all' || result.format === formatFilter)
     .sort((a, b) => {
       const aTitle = displayTitle(a).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -1213,26 +1316,26 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
   return (
     <div className="overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="modal search-modal">
-        <div className="modal-header"><div><p className="eyebrow">{allowExisting ? 'SUA COLEÇÃO E CATÁLOGO' : 'ENCONTRE SEU PRÓXIMO ANIME'}</p><h2>{allowExisting ? 'Adicionar à lista' : 'Buscar no catálogo'}</h2>{allowExisting && targetListName && <small className="target-list-name">{targetListName}</small>}</div><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={18} /></button></div>
+        <div className="modal-header"><div><p className="eyebrow">{allowExisting ? 'SUA COLEÇÃO E CATÁLOGO' : searchMode === 'global' ? 'PESQUISA GLOBAL' : 'ENCONTRE SEU PRÓXIMO ANIME'}</p><h2>{allowExisting ? 'Adicionar à lista' : searchMode === 'global' ? 'Buscar animes' : 'Adicionar à biblioteca'}</h2>{allowExisting && targetListName && <small className="target-list-name">{targetListName}</small>}</div><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={18} /></button></div>
         <form className="catalog-search" onSubmit={onSearch}>
           <Search size={19} />
-          <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={allowExisting ? 'Filtrar sua biblioteca ou buscar no catálogo...' : 'Digite pelo menos 2 letras do anime...'} />
+          <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={allowExisting ? 'Filtrar sua biblioteca ou buscar no catálogo...' : searchMode === 'global' ? 'Buscar na biblioteca ou no catálogo...' : 'Digite pelo menos 2 letras do anime...'} />
           {searching && <LoaderCircle className="spin" size={17} />}
         </form>
-        <p className="helper-text">{allowExisting ? 'Escolha um anime que já está na sua biblioteca ou pesquise no catálogo para adicionar um novo.' : 'Os resultados aparecem automaticamente enquanto você digita.'}</p>
-        {allowExisting && (
-          <section className="library-picker-section">
-            <div className="library-picker-heading"><div><strong>Da sua biblioteca</strong><span>{filteredLibrary.length} {filteredLibrary.length === 1 ? 'anime disponível' : 'animes disponíveis'}</span></div><span>SEM NOVO CADASTRO</span></div>
-            {visibleLibrary.length ? <div className="results-list library-picker-list">{visibleLibrary.map(anime => (
-              <article className="result-row" key={'library-' + anime.mal_id}>
-                {anime.image_url ? <img src={anime.image_url} alt="" /> : <div className="result-cover-fallback"><Clapperboard size={18} /></div>}
-                <div className="result-info"><strong>{displayTitle(anime)}</strong><small>{statusLabel(anime.status)} · {Number(anime.episode_current || 0)} episódios assistidos</small></div>
-                <button type="button" className="outline-button" onClick={() => onAdd(anime)}><Plus size={14} />Adicionar à lista</button>
-              </article>
-            ))}</div> : <div className="library-picker-empty">{normalizedQuery ? 'Nenhum título da sua biblioteca corresponde à pesquisa.' : 'Todos os animes da sua biblioteca já estão nesta lista.'}</div>}
-            {filteredLibrary.length > visibleLibrary.length && <p className="library-picker-more">Mostrando os 24 mais recentes. Digite para filtrar os demais.</p>}
-          </section>
-        )}
+        <p className="helper-text">{allowExisting ? 'Escolha um anime já cadastrado ou pesquise um título externo para adicionar à lista.' : searchMode === 'global' ? 'A busca encontra primeiro os títulos da sua biblioteca e também consulta o catálogo externo.' : 'Os resultados aparecem automaticamente enquanto você digita. Os títulos só entram na biblioteca quando você os adiciona.'}</p>
+        {showLibrary && <section className="library-picker-section">
+          <div className="library-picker-heading"><div><strong>Da sua biblioteca</strong><span>{filteredLibrary.length} {filteredLibrary.length === 1 ? 'anime encontrado' : 'animes encontrados'}</span></div><span>{allowExisting ? 'SEM NOVO CADASTRO' : 'SEUS TÍTULOS'}</span></div>
+          {visibleLibrary.length ? <div className="results-list library-picker-list">{visibleLibrary.map(anime => (
+            <article className="result-row" key={'library-' + anime.mal_id}>
+              {anime.image_url ? <img src={anime.image_url} alt="" /> : <div className="result-cover-fallback"><Clapperboard size={18} /></div>}
+              <div className="result-info"><strong>{displayTitle(anime)}</strong><small>{statusLabel(anime.status)} · {Number(anime.episode_current || 0)} episódios assistidos</small></div>
+              {allowExisting
+                ? <button type="button" className="outline-button" onClick={() => onAdd(anime)}><Plus size={14} />Adicionar à lista</button>
+                : <button type="button" className="outline-button" onClick={() => onOpenExisting(anime)}>Abrir anime</button>}
+            </article>
+          ))}</div> : <div className="library-picker-empty">{normalizedQuery ? 'Nenhum título da sua biblioteca corresponde à pesquisa.' : allowExisting ? 'Todos os animes da sua biblioteca já estão nesta lista.' : 'Sua biblioteca ainda não tem títulos.'}</div>}
+          {filteredLibrary.length > visibleLibrary.length && <p className="library-picker-more">Mostrando os 24 mais recentes. Digite para filtrar os demais.</p>}
+        </section>}
         {error && <div className="error-panel"><span>{error}</span><button type="button" className="outline-button" onClick={onManual}>Adicionar manualmente</button></div>}
         {results.length > 0 && <div className="search-format-tabs" role="group" aria-label="Filtrar formato">{formatOptions.map(option => <button type="button" key={option.id} className={formatFilter === option.id ? 'active' : ''} onClick={() => setFormatFilter(option.id)}>{option.label}</button>)}</div>}
         {searching && !results.length && <div className="loading-block compact-loading"><LoaderCircle className="spin" />Buscando “{query.trim()}” no catálogo...</div>}

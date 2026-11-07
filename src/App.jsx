@@ -1360,6 +1360,7 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
                 lists={lists}
                 hasMore={hasMore}
                 moreLoading={moreLoading}
+                moreError={moreError}
                 onLoadMore={onLoadMore}
                 onOpenAnime={onOpenAnime}
                 onAdd={onAdd}

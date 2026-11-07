@@ -61,6 +61,12 @@ export async function fetchAniListByMalId(malId) {
 }
 
 export function toJikanShape(item) {
+  const status = String(item.status || '').toUpperCase();
+  const nextAiringNumber = Number(item.nextAiringEpisode?.episode || 0);
+  const episodesAvailable = status === 'RELEASING' && nextAiringNumber > 0
+    ? Math.max(0, nextAiringNumber - 1)
+    : status === 'FINISHED' ? Number(item.episodes || 0) || null : null;
+
   return {
     mal_id: item.idMal,
     title: item.title?.romaji || item.title?.native || item.title?.english || 'Sem título',
@@ -70,7 +76,8 @@ export function toJikanShape(item) {
       jpg: { large_image_url: item.coverImage?.large || '' }
     },
     synopsis: (item.description || '').replace(/<[^>]*>/g, ''),
-    episodes: item.episodes ?? (item.status === 'RELEASING' && item.nextAiringEpisode?.episode ? item.nextAiringEpisode.episode - 1 : null),
+    episodes: item.episodes ?? null,
+    episodes_available: episodesAvailable,
     status: item.status || null,
     year: item.seasonYear ?? null,
     season: item.season?.toLowerCase() || null,

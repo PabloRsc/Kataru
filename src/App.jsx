@@ -658,7 +658,8 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <button className="brand" onClick={() => navigate('home')} aria-label="Kataru — início">
-          <span className="brand-name">kataru<span>.</span></span>
+          <img className="brand-mark" src="/kataru-mark.png" alt="" />
+          <img className="brand-wordmark" src="/kataru-wordmark.png" alt="Kataru" />
         </button>
         <nav className="main-nav" aria-label="Navegação principal">
           <button className={page === 'home' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('home')}>Início</button>
@@ -805,7 +806,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <span className="footer-brand">KATARU<span>.</span></span>
+        <img className="footer-wordmark" src="/kataru-wordmark.png" alt="Kataru" />
         <span>Seu universo de animes, em um só lugar.</span>
         <span className="storage-label">{storageMode === 'supabase' ? 'Sincronizado na nuvem' : 'Salvo neste navegador'}</span>
       </footer>

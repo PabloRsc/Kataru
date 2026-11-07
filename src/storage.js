@@ -145,6 +145,7 @@ function toRow(anime, ownerId) {
     synopsis: anime.synopsis || null,
     episodes_total: anime.episodes_total ?? null,
     episodes_available: anime.episodes_available ?? null,
+    airing_status: anime.airing_status || null,
     episodes_total_manual: anime.episodes_total_manual ?? null,
     year: anime.year ?? null,
     season: anime.season || null,

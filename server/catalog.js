@@ -30,15 +30,15 @@ async function sendAniListFallback(res, route, params) {
   }
 }
 
-export default async function catalogHandler(req, res) {
+export default async function catalogHandler(req, res, forcedSegments = null) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ message: 'Método não permitido.' });
   }
 
-  const segments = Array.isArray(req.query.path)
+  const segments = forcedSegments || (Array.isArray(req.query.path)
     ? req.query.path
-    : String(req.query.path || '').split('/').filter(Boolean);
+    : String(req.query.path || '').split('/').filter(Boolean));
   const route = segments.join('/');
 
   if (!ALLOWED_ROUTES.has(route)) {

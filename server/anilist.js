@@ -4,6 +4,7 @@ const MEDIA_FIELDS = `
   id
   idMal
   title { romaji english native }
+  synonyms
   coverImage { large extraLarge }
   description(asHtml: false)
   episodes
@@ -72,6 +73,8 @@ export function toJikanShape(item) {
     mal_id: item.idMal,
     title: item.title?.romaji || item.title?.native || item.title?.english || 'Sem título',
     title_english: item.title?.english || '',
+    title_japanese: item.title?.native || '',
+    title_synonyms: item.synonyms || [],
     images: {
       webp: { large_image_url: item.coverImage?.extraLarge || item.coverImage?.large || '' },
       jpg: { large_image_url: item.coverImage?.large || '' }

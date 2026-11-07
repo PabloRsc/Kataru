@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { searchAnime } from './api';
 import { isSupabaseConfigured, setAuthPersistence, supabase } from './storage';
+import { KATARU_MARK, KATARU_WORDMARK } from './brand-assets';
 import './AuthGate.css';
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,20}$/;
@@ -38,8 +39,8 @@ function mailboxUrl(email) {
 function Brand({ compact = false }) {
   return (
     <span className={compact ? 'auth-brand auth-brand-compact' : 'auth-brand'}>
-      <img className="auth-brand-mark" src="/kataru-mark.png" alt="" />
-      <img className="auth-brand-word" src="/kataru-wordmark.png" alt="Kataru" />
+      <img className="auth-brand-mark" src={KATARU_MARK} alt="" />
+      <img className="auth-brand-word" src={KATARU_WORDMARK} alt="Kataru" />
     </span>
   );
 }

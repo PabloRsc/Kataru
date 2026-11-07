@@ -898,6 +898,13 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
 function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd }) {
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featured = watching[featuredIndex] || watching[0] || null;
+  const currentEpisode = Number(featured?.episode_current || 0);
+  const expectedTotal = featured && !isCurrentlyAiring(featured) ? totalEpisodes(featured) : null;
+  const available = featured ? episodeProgressLimit(featured) : null;
+  const nextEpisode = currentEpisode + 1;
+  const canMarkNext = Boolean(featured && (available ? currentEpisode < available : expectedTotal ? currentEpisode < expectedTotal : false));
+  const progressTotal = expectedTotal || available;
+  const progress = progressTotal ? Math.min(100, Math.round((currentEpisode / progressTotal) * 100)) : 0;
 
   useEffect(() => {
     if (watching.length < 2) {
@@ -926,6 +933,19 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
           <div className="continue-copy">
             <span className="hero-kicker"><Zap size={13} fill="currentColor" /> CONTINUE DE ONDE PAROU</span>
             <button className="continue-title" onClick={() => onOpenAnime(featured)}>{displayTitle(featured)}</button>
+            <p className="continue-episode-count">
+              {expectedTotal ? expectedTotal + ' episódios' : available ? available + (isCurrentlyAiring(featured) ? ' episódios lançados até agora' : ' episódios') : 'Série em andamento'}
+            </p>
+            <div className="hero-progress">
+              <div><span style={{ width: progress + '%' }} /></div>
+              <small>{expectedTotal ? 'EP. ' + currentEpisode + ' / ' + expectedTotal : available ? 'EP. ' + currentEpisode + ' / ' + available + (isCurrentlyAiring(featured) ? ' lançados' : '') : 'EP. ' + currentEpisode}</small>
+            </div>
+            <div className="hero-actions">
+              {canMarkNext
+                ? <button className="primary-button" onClick={() => onQuickEpisode(featured)}><Check size={15} />Marcar ep. {nextEpisode} como visto</button>
+                : <span className="hero-up-to-date">{available && currentEpisode >= available ? 'Você está em dia com os episódios lançados.' : 'O catálogo ainda não confirmou o próximo episódio.'}</span>}
+              <button className="hero-secondary" onClick={() => onOpenAnime(featured)}>Ver detalhes <ArrowRight size={15} /></button>
+            </div>
           </div>
           <button className="continue-poster" onClick={() => onOpenAnime(featured)} aria-label={'Abrir ' + displayTitle(featured)}>
             {featured.image_url
@@ -933,11 +953,10 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
               : <span><Clapperboard size={34} /></span>}
           </button>
           {watching.length > 1 && (
-            <div className="continue-controls" aria-label="Navegar entre animes em andamento">
-              <button onClick={() => setFeaturedIndex(current => (current - 1 + watching.length) % watching.length)} aria-label="Anime anterior"><ChevronLeft size={17} /></button>
-              <span>{(featuredIndex % watching.length) + 1} / {watching.length}</span>
-              <button onClick={() => setFeaturedIndex(current => (current + 1) % watching.length)} aria-label="Próximo anime"><ChevronRight size={17} /></button>
-            </div>
+            <>
+              <button className="continue-side-control continue-side-prev" onClick={() => setFeaturedIndex(current => (current - 1 + watching.length) % watching.length)} aria-label="Anime anterior"><ChevronLeft size={21} /></button>
+              <button className="continue-side-control continue-side-next" onClick={() => setFeaturedIndex(current => (current + 1) % watching.length)} aria-label="Próximo anime"><ChevronRight size={21} /></button>
+            </>
           )}
         </section>
       ) : (
@@ -1100,7 +1119,6 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
 
   return (
     <div className="discover-page">
-      <PageIntro eyebrow="EXPLORE NOVAS HISTÓRIAS" title="Descobrir" subtitle="Encontre seu próximo anime favorito." />
       <div className="discover-tabs" role="tablist" aria-label="Categorias de descoberta">
         {DISCOVER_TABS.map(item => (
           <button

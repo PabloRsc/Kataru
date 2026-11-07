@@ -66,7 +66,8 @@ export async function fetchAnimeGenres() {
   const entries = await request('/api/catalog/genres/anime?filter=genres');
   return catalogEntries(entries).map(genre => ({
     mal_id: Number.isSafeInteger(Number(genre.mal_id)) ? Number(genre.mal_id) : null,
-    name: genre.name
+    name: genre.name,
+    count: Number.isFinite(Number(genre.count)) && Number(genre.count) > 0 ? Number(genre.count) : null
   })).filter(genre => genre.name);
 }
 

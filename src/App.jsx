@@ -110,6 +110,9 @@ export default function App() {
   const [discoverGenres, setDiscoverGenres] = useState([]);
   const [discoverGenre, setDiscoverGenre] = useState(null);
   const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverMoreLoading, setDiscoverMoreLoading] = useState(false);
+  const [discoverPage, setDiscoverPage] = useState(1);
+  const [discoverHasMore, setDiscoverHasMore] = useState(false);
   const [discoverReload, setDiscoverReload] = useState(0);
   const [discoverError, setDiscoverError] = useState('');
   const [listEditorOpen, setListEditorOpen] = useState(false);
@@ -198,14 +201,21 @@ export default function App() {
     if (page !== 'discover') return undefined;
     let active = true;
     setDiscoverLoading(true);
+    setDiscoverMoreLoading(false);
     setDiscoverError('');
+    setDiscoverResults([]);
+    setDiscoverPage(1);
+    setDiscoverHasMore(false);
 
     if (discoverTab === 'genres') {
-      Promise.all([fetchAnimeGenres(), discoverAnime('popular').catch(() => [])])
+      Promise.all([
+        fetchAnimeGenres(),
+        discoverAnime('popular', 1).catch(() => ({ items: [] }))
+      ])
         .then(([genres, recommendations]) => {
           if (!active) return;
           setDiscoverGenres(genres || []);
-          setDiscoverRecommendations(recommendations || []);
+          setDiscoverRecommendations(recommendations.items || []);
           setDiscoverResults([]);
         })
         .catch(error => {
@@ -216,15 +226,18 @@ export default function App() {
       const kind = discoverTab === 'genre' && discoverGenre
         ? 'genre-' + encodeURIComponent(discoverGenre.name || discoverGenre.mal_id || '')
         : discoverTab;
-      const recommendationRequest = discoverTab === 'popular'
-        ? discoverAnime('top-rated').catch(() => [])
-        : discoverAnime('popular').catch(() => []);
+      const recommendationKind = discoverTab === 'popular' ? 'top-rated' : 'popular';
 
-      Promise.all([discoverAnime(kind), recommendationRequest])
+      Promise.all([
+        discoverAnime(kind, 1),
+        discoverAnime(recommendationKind, 1).catch(() => ({ items: [] }))
+      ])
         .then(([data, recommendations]) => {
           if (!active) return;
-          setDiscoverResults(data || []);
-          setDiscoverRecommendations(recommendations || []);
+          setDiscoverResults(data.items || []);
+          setDiscoverPage(data.page || 1);
+          setDiscoverHasMore(Boolean(data.hasMore));
+          setDiscoverRecommendations(recommendations.items || []);
         })
         .catch(error => {
           if (active) setDiscoverError(error.message || 'Não foi possível carregar o catálogo.');
@@ -233,6 +246,30 @@ export default function App() {
     }
     return () => { active = false; };
   }, [page, discoverTab, discoverGenre, discoverReload]);
+
+  async function loadMoreDiscover() {
+    if (discoverLoading || discoverMoreLoading || !discoverHasMore || discoverTab === 'genres') return;
+    const kind = discoverTab === 'genre' && discoverGenre
+      ? 'genre-' + encodeURIComponent(discoverGenre.name || discoverGenre.mal_id || '')
+      : discoverTab;
+    const nextPage = discoverPage + 1;
+    setDiscoverMoreLoading(true);
+    setDiscoverError('');
+    try {
+      const response = await discoverAnime(kind, nextPage);
+      setDiscoverResults(current => {
+        const known = new Set(current.map(anime => String(anime.mal_id)));
+        const next = (response.items || []).filter(anime => !known.has(String(anime.mal_id)));
+        return [...current, ...next];
+      });
+      setDiscoverPage(response.page || nextPage);
+      setDiscoverHasMore(Boolean(response.hasMore));
+    } catch (error) {
+      setDiscoverError(error.message || 'Não foi possível carregar mais animes.');
+    } finally {
+      setDiscoverMoreLoading(false);
+    }
+  }
 
   useEffect(() => {
     items.filter(anime =>
@@ -778,6 +815,9 @@ export default function App() {
             genres={discoverGenres}
             lists={lists}
             loading={discoverLoading}
+            hasMore={discoverHasMore}
+            moreLoading={discoverMoreLoading}
+            onLoadMore={loadMoreDiscover}
             error={discoverError}
             selectedGenre={discoverGenre}
             collection={items}
@@ -913,7 +953,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
   const expectedTotal = featured && !isCurrentlyAiring(featured) ? totalEpisodes(featured) : null;
   const available = featured ? episodeProgressLimit(featured) : null;
   const nextEpisode = currentEpisode + 1;
-  const canMarkNext = Boolean(featured && (available ? currentEpisode < available : expectedTotal ? currentEpisode < expectedTotal : false));
+  const canMarkNext = Boolean(featured && (!progressTotal || currentEpisode < progressTotal));
   const progressTotal = expectedTotal || available;
   const progress = progressTotal ? Math.min(100, Math.round((currentEpisode / progressTotal) * 100)) : 0;
 
@@ -1023,8 +1063,11 @@ function PosterCard({ anime, onClick, compact = false }) {
       <div className="poster-art">
         {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <div className="poster-fallback"><Clapperboard size={25} /></div>}
         <span className={'status-pill tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
-        {anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
-        {anime.status === 'watching' && <span className="poster-progress"><i style={{ width: progress + '%' }} /></span>}
+        {anime.status !== 'watching' && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
+        {anime.status === 'watching' && <>
+          <span className="poster-progress"><i style={{ width: progress + '%' }} /></span>
+          <span className="poster-episode-count">EP. {Number(anime.episode_current || 0)}{total ? ' / ' + total : ''}</span>
+        </>}
       </div>
       <span className="poster-name">{displayTitle(anime)}</span>
       <span className="poster-meta">{anime.year || 'Ano não informado'}{anime.format ? ' · ' + anime.format : ''}</span>
@@ -1090,7 +1133,7 @@ function AnimeRow({ anime, onClick }) {
       <span className="row-title"><strong>{displayTitle(anime)}</strong><small>{anime.year || '—'} · {anime.format || 'Anime'}</small></span>
       <span className={'row-status tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
       <span className="row-progress">{total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}<i><b style={{ width: pct + '%' }} /></i></span>
-      <span className="row-rating">{anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
+      <span className="row-rating">{anime.status !== 'watching' && anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
       <ChevronRight size={16} className="row-chevron" />
     </button>
   );
@@ -1486,7 +1529,7 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
   const progressTotal = total || available;
   const current = Number(anime.episode_current || 0);
   const progress = progressTotal ? Math.min(100, Math.round((current / progressTotal) * 100)) : 0;
-  const canAdvance = Boolean(progressTotal && current < progressTotal);
+  const canAdvance = ['watching', 'paused', 'dropped'].includes(anime.status) && (!progressTotal || current < progressTotal);
   const ratingStars = anime.rating_personal ? Math.round(Number(anime.rating_personal) / 2) : 0;
 
   return (
@@ -1531,7 +1574,9 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
           </div>
 
           <div className="detail-rating-notes">
-            <section className="rating-panel"><div className="detail-block-heading"><span>SUA NOTA</span><strong>{anime.rating_personal ? (Number(anime.rating_personal) / 2).toFixed(1) + ' / 5' : 'Ainda sem nota'}</strong></div><StarRating value={ratingStars} onChange={onRatingChange} /></section>
+            {anime.status === 'watching'
+              ? <section className="rating-panel rating-panel-locked"><div className="detail-block-heading"><span>SUA NOTA</span><strong>Avaliação após concluir</strong></div><p>Finalize o anime para registrar sua avaliação. Uma nota salva anteriormente será mantida.</p></section>
+              : <section className="rating-panel"><div className="detail-block-heading"><span>SUA NOTA</span><strong>{anime.rating_personal ? (Number(anime.rating_personal) / 2).toFixed(1) + ' / 5' : 'Ainda sem nota'}</strong></div><StarRating value={ratingStars} onChange={onRatingChange} /></section>}
           </div>
 
           <div className="detail-info-grid">
@@ -1645,7 +1690,7 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
   const maxEpisode = total || available || undefined;
   const episode = Number(form.episode_current || 0);
   const needsEpisode = ['watching', 'paused', 'dropped'].includes(form.status);
-  const showRating = form.status !== 'planned';
+  const showRating = !['planned', 'watching'].includes(form.status);
   const dateShortcuts = key => <div className="date-shortcuts">
     <button type="button" onClick={() => update(key, today)}>Hoje</button>
     <button type="button" onClick={() => update(key, '')}>Não lembro</button>

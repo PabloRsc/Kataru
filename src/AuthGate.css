@@ -346,3 +346,15 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-screen *, .auth-screen *::before, .auth-screen *::after { animation: none !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* Original logo assets used in the authenticated app shell */
+.topbar .brand { display: inline-flex; align-items: center; gap: 9px; flex: 0 0 auto; }
+.topbar .brand-mark { display: block; width: 34px; height: 35px; flex: 0 0 34px; object-fit: contain; }
+.topbar .brand-wordmark { display: block; width: 112px; height: auto; object-fit: contain; }
+.footer-wordmark { display: block; width: 96px; max-height: 24px; object-fit: contain; }
+@media (max-width: 600px) {
+  .topbar .brand { gap: 6px; }
+  .topbar .brand-mark { width: 29px; height: 30px; flex-basis: 29px; }
+  .topbar .brand-wordmark { width: 91px; }
+  .footer-wordmark { width: 84px; }
+}

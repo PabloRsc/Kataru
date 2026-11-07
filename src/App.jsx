@@ -1114,7 +1114,31 @@ const GENRE_LOCALIZATION = {
   'suspense': { label: 'Suspense', accent: '#6C8EBF' },
   'award winning': { label: 'Premiados', accent: '#D6B66B' },
   'gourmet': { label: 'Gastronomia', accent: '#F4A261' },
-  'hentai': { label: 'Hentai', accent: '#C45D87' }
+  'hentai': { label: 'Hentai', accent: '#C45D87' },
+  'kids': { label: 'Infantil', accent: '#F2C26B' },
+  'workplace': { label: 'Ambiente de trabalho', accent: '#6B9C91' },
+  'mythology': { label: 'Mitologia', accent: '#D6B66B' },
+  'psychological': { label: 'Psicológico', accent: '#8C82C8' },
+  'racing': { label: 'Corrida', accent: '#C76D4E' },
+  'samurai': { label: 'Samurai', accent: '#9C5B58' },
+  'space': { label: 'Espaço', accent: '#4C6B9B' },
+  'vampire': { label: 'Vampiros', accent: '#9A3C58' },
+  'visual arts': { label: 'Artes visuais', accent: '#C07DAD' },
+  'performing arts': { label: 'Artes cênicas', accent: '#C07E61' },
+  'pets': { label: 'Animais de estimação', accent: '#8EAF77' },
+  'strategy game': { label: 'Jogos de estratégia', accent: '#A18A58' },
+  'reincarnation': { label: 'Reencarnação', accent: '#8776C9' },
+  'love polygon': { label: 'Triângulo amoroso', accent: '#D77C9C' },
+  'crossdressing': { label: 'Crossdressing', accent: '#9D83C6' },
+  'genderswap': { label: 'Troca de gênero', accent: '#C68FAE' },
+  'delinquents': { label: 'Delinquentes', accent: '#9D6A52' },
+  'educational': { label: 'Educativo', accent: '#6EA4B8' },
+  'mahou shoujo': { label: 'Garotas mágicas', accent: '#E59BC8' },
+  'historical': { label: 'Histórico', accent: '#B69A6B' },
+  'military': { label: 'Militar', accent: '#82916E' },
+  'parody': { label: 'Paródia', accent: '#D9A64E' },
+  'police': { label: 'Policial', accent: '#5C86B8' },
+  'post-apocalyptic': { label: 'Pós-apocalíptico', accent: '#8C735A' }
 };
 const genreKey = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 const localizedGenre = genre => GENRE_LOCALIZATION[genreKey(genre?.name)] || { label: genre?.name || 'Gênero', accent: '#8B7CFF' };

@@ -26,9 +26,15 @@ async function request(path) {
   }
 }
 
-async function requestCatalog(path) {
+async function requestCatalog(path, requestedPage = 1) {
   const data = await request(path);
-  return catalogEntries(data).map(normalizeAnime);
+  const pagination = data?.pagination || {};
+  return {
+    items: catalogEntries(data).map(normalizeAnime),
+    page: Number(pagination.current_page) || requestedPage,
+    hasMore: Boolean(pagination.has_next_page),
+    totalItems: Number(pagination.items?.total) || null
+  };
 }
 
 export async function searchAnime(query) {
@@ -41,25 +47,25 @@ export async function fetchAnime(malId) {
   return normalizeAnime(data.data || data);
 }
 
-export async function discoverAnime(kind = 'season') {
+export async function discoverAnime(kind = 'season', page = 1) {
   let path;
   if (kind === 'season') {
-    path = '/api/catalog/seasons/now?filter=tv&limit=24&sfw=true';
+    path = '/api/catalog/seasons/now?filter=tv&limit=24&sfw=true&page=' + Math.max(1, Number(page) || 1);
   } else if (kind === 'upcoming') {
-    path = '/api/catalog/seasons/upcoming?filter=tv&limit=24&sfw=true';
+    path = '/api/catalog/seasons/upcoming?filter=tv&limit=24&sfw=true&page=' + Math.max(1, Number(page) || 1);
   } else if (kind === 'popular') {
-    path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
+    path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true&page=' + Math.max(1, Number(page) || 1);
   } else if (kind === 'top-rated') {
-    path = '/api/catalog/top/anime?type=tv&limit=24&sfw=true&ranking=score';
+    path = '/api/catalog/top/anime?type=tv&limit=24&sfw=true&ranking=score&page=' + Math.max(1, Number(page) || 1);
   } else if (String(kind).startsWith('genre-')) {
     const genre = decodeURIComponent(String(kind).slice(6)).trim();
     if (!genre) throw new Error('Escolha um gênero para continuar.');
-    path = '/api/catalog/anime?genre=' + encodeURIComponent(genre) + '&order_by=popularity&sort=asc&limit=24&sfw=true';
+    path = '/api/catalog/anime?genre=' + encodeURIComponent(genre) + '&order_by=popularity&sort=asc&limit=24&sfw=true&page=' + Math.max(1, Number(page) || 1);
   } else {
-    path = '/api/catalog/seasons/now?filter=tv&limit=24&sfw=true';
+    path = '/api/catalog/seasons/now?filter=tv&limit=24&sfw=true&page=' + Math.max(1, Number(page) || 1);
   }
 
-  return requestCatalog(path);
+  return requestCatalog(path, Math.max(1, Number(page) || 1));
 }
 
 export async function fetchAnimeGenres() {

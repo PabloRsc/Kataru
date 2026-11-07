@@ -1237,11 +1237,12 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
         {searching && !results.length && <div className="loading-block compact-loading"><LoaderCircle className="spin" />Buscando “{query.trim()}” no catálogo...</div>}
         {filteredResults.length > 0 && <div className="results-list">{filteredResults.map(result => {
           const exists = isInCollection(result);
-          const canAddToList = exists && allowExisting;
+          const inThisList = alreadyInList.has(String(result.mal_id));
+          const canAddToList = exists && allowExisting && !inThisList;
           return <article className="result-row" key={'catalog-' + result.mal_id}>
             {result.image_url ? <img src={result.image_url} alt="" /> : <div className="result-cover-fallback"><Clapperboard size={18} /></div>}
             <div className="result-info"><strong>{displayTitle(result)}</strong>{result.title_english && result.title_english !== result.title && <span>{result.title_english}</span>}<small>{result.year || 'Ano não informado'} · {result.episodes_total ?? '?'} episódios · {result.format || 'Anime'}</small></div>
-            <button type="button" className={exists && !canAddToList ? 'outline-button result-added' : 'outline-button'} disabled={exists && !canAddToList} onClick={() => onAdd(result)}>{canAddToList ? <><Plus size={14} />Adicionar à lista</> : exists ? <><Check size={14} />Na biblioteca</> : <><Plus size={14} />Adicionar</>}</button>
+            <button type="button" className={inThisList || (exists && !canAddToList) ? 'outline-button result-added' : 'outline-button'} disabled={inThisList || (exists && !canAddToList)} onClick={() => onAdd(result)}>{inThisList ? <><Check size={14} />Já está na lista</> : canAddToList ? <><Plus size={14} />Adicionar à lista</> : exists ? <><Check size={14} />Na biblioteca</> : <><Plus size={14} />Adicionar</>}</button>
           </article>;
         })}</div>}
         {!searching && !error && !results.length && !visibleLibrary.length && <div className="search-empty"><Search size={25} /><p>{query.trim().length >= 2 ? 'Nenhum anime encontrado para esta pesquisa.' : allowExisting ? 'Pesquise no catálogo para encontrar novos títulos.' : 'Comece digitando o nome de um anime.'}</p><button className="text-link" type="button" onClick={onManual}>{query.trim().length >= 2 ? 'Não encontrou no catálogo? Adicionar manualmente' : 'Adicionar manualmente'} <ArrowRight size={13} /></button></div>}

@@ -33,7 +33,8 @@ export default async function handler(req, res) {
     }
 
     // When AniList has no next-airing schedule, use Jikan's episode catalogue as fallback.
-    if (!anime.episodes_available && /currently airing|airing|releasing/i.test(String(anime.status || ''))) {
+    const currentAiringStatus = String(anime.status || '').trim().toLowerCase();
+    if (!anime.episodes_available && ['currently airing', 'airing', 'releasing', 'ongoing'].includes(currentAiringStatus)) {
       try {
         const firstPage = await requestJikan('/anime/' + numericId + '/episodes?page=1');
         const lastPageNumber = Math.max(1, Number(firstPage.data.pagination?.last_visible_page || 1));

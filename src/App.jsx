@@ -683,14 +683,14 @@ export default function App() {
                   : getInitials(authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email || 'K')}
               </span>
               <span className="profile-copy">
-                <strong>{authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
+                <strong>{authUser?.user_metadata?.username || authUser?.user_metadata?.username || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
                 <small>{authUser?.email || 'Dados salvos neste navegador'}</small>
               </span>
               <ChevronDown className="profile-chevron" size={14} />
             </button>
             {profileOpen && <div className="profile-dropdown" role="menu">
               <div className="profile-dropdown-user">
-                <strong>{authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
+                <strong>{authUser?.user_metadata?.username || authUser?.user_metadata?.username || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
                 <span>{authUser?.email || 'Seus dados ficam salvos neste navegador.'}</span>
               </div>
               {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={async () => {
@@ -807,7 +807,7 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <img className="footer-wordmark" src="/kataru-wordmark.png" alt="Kataru" />
+        <img className="footer-wordmark" src={KATARU_WORDMARK} alt="Kataru" />
         <span>Seu universo de animes, em um só lugar.</span>
         <span className="storage-label">{storageMode === 'supabase' ? 'Sincronizado na nuvem' : 'Salvo neste navegador'}</span>
       </footer>

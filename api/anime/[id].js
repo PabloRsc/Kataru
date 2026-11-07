@@ -14,45 +14,34 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await requestJikan('/anime/' + numericId + '/full');
-    let anime = result.data;
+    // Ask both catalog sources in parallel. This avoids chaining several Jikan
+    // episode-page requests for long-running titles and reduces serverless timeouts.
+    const [jikanResult, aniListResult] = await Promise.allSettled([
+      requestJikan('/anime/' + numericId + '/full'),
+      fetchAniListByMalId(numericId)
+    ]);
 
-    // AniList exposes the next scheduled episode. For an airing series, N - 1 is
-    // the latest episode already released; it is distinct from the final series total.
-    try {
-      const alternate = await fetchAniListByMalId(numericId);
-      const extra = toJikanShape(alternate);
-      anime = {
-        ...anime,
-        episodes: anime.episodes ?? extra.episodes,
-        episodes_available: extra.episodes_available ?? anime.episodes_available ?? null,
-        status: anime.status || extra.status
-      };
-    } catch {
-      // Keep Jikan metadata if the secondary catalog is unavailable.
+    if (jikanResult.status !== 'fulfilled' && aniListResult.status !== 'fulfilled') {
+      const unavailable = new Error('Não foi possível consultar os catálogos de animes agora.');
+      unavailable.status = 502;
+      throw unavailable;
     }
 
-    // When AniList has no next-airing schedule, use Jikan's episode catalogue as fallback.
-    const currentAiringStatus = String(anime.status || '').trim().toLowerCase();
-    if (!anime.episodes_available && ['currently airing', 'airing', 'releasing', 'ongoing'].includes(currentAiringStatus)) {
-      try {
-        const firstPage = await requestJikan('/anime/' + numericId + '/episodes?page=1');
-        const lastPageNumber = Math.max(1, Number(firstPage.data.pagination?.last_visible_page || 1));
-        const lastPage = lastPageNumber > 1
-          ? await requestJikan('/anime/' + numericId + '/episodes?page=' + lastPageNumber)
-          : firstPage;
-        const airedEpisodes = (lastPage.data.data || [])
-          .filter(episode => episode.aired && new Date(episode.aired).getTime() <= Date.now())
-          .map(episode => Number(episode.mal_id))
-          .filter(number => Number.isFinite(number) && number > 0);
-        if (airedEpisodes.length) anime = { ...anime, episodes_available: Math.max(...airedEpisodes) };
-      } catch {
-        // Keep null rather than making up an episode count.
-      }
-    }
-    res.setHeader('X-Kataru-Catalog-Source', 'jikan+anilist');
+    const jikanAnime = jikanResult.status === 'fulfilled' ? jikanResult.value.data : null;
+    const aniListAnime = aniListResult.status === 'fulfilled' ? toJikanShape(aniListResult.value) : null;
+    const anime = {
+      ...(jikanAnime || aniListAnime),
+      ...(aniListAnime ? {
+        episodes: jikanAnime?.episodes ?? aniListAnime.episodes,
+        episodes_available: aniListAnime.episodes_available ?? jikanAnime?.episodes_available ?? null,
+        status: jikanAnime?.status || aniListAnime.status
+      } : {})
+    };
+
+    res.setHeader('X-Kataru-Catalog-Source', jikanAnime && aniListAnime ? 'jikan+anilist' : jikanAnime ? 'jikan' : 'anilist-fallback');
     res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
     return res.status(200).json(anime);
+  }
   } catch (jikanError) {
     try {
       const media = await fetchAniListByMalId(numericId);

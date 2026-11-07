@@ -186,7 +186,7 @@ export default function App() {
       if (availabilityRequestsRef.current.has(id)) return;
       availabilityRequestsRef.current.add(id);
       fetchAnime(anime.mal_id).then(async fresh => {
-        if (!fresh.episodes_available) return;
+        if (!fresh.episodes_available && !fresh.airing_status && !fresh.episodes_total) return;
         const merged = {
           ...anime,
           ...fresh,

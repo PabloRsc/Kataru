@@ -32,9 +32,13 @@ export default async function handler(req, res) {
           ...catalog,
           data: catalog.data.map(item => {
             const extra = byMalId.get(item.mal_id);
-            return item.episodes == null && extra?.episodes != null
-              ? { ...item, episodes: extra.episodes }
-              : item;
+            if (!extra) return item;
+            return {
+              ...item,
+              episodes: item.episodes ?? extra.episodes,
+              episodes_available: item.episodes_available ?? extra.episodes_available,
+              status: item.status || extra.status
+            };
           })
         };
       } catch {

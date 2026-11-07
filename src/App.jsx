@@ -1189,7 +1189,7 @@ const genreKey = value => String(value || '').normalize('NFD').replace(/[\u0300-
 const localizedGenre = genre => GENRE_LOCALIZATION[genreKey(genre?.name)] || { label: genre?.name || 'Gênero', accent: '#8B7CFF' };
 const localizedFormat = value => ({ Movie: 'Filme', TV: 'TV', ONA: 'ONA', OVA: 'OVA', Special: 'Especial', Music: 'Música' }[value] || value || 'Anime');
 
-function DiscoverPage({ tab, setTab, results, recommendations: recommendationSource, genres, lists, loading, error, selectedGenre, collection, onRetry, onSelectGenre, onOpenAnime, onAdd, onAddToList, findInCollection, isInCollection }) {
+function DiscoverPage({ tab, setTab, results, recommendations: recommendationSource, genres, lists, loading, hasMore, moreLoading, onLoadMore, error, selectedGenre, collection, onRetry, onSelectGenre, onOpenAnime, onAdd, onAddToList, findInCollection, isInCollection }) {
   const [genreQuery, setGenreQuery] = useState('');
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
   const shownGenres = genres.filter(genre => {
@@ -1200,10 +1200,14 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
   (collection || []).forEach(anime => (anime.genres || []).forEach(genre => {
     genreAffinity[genre] = (genreAffinity[genre] || 0) + (anime.status === 'completed' || anime.status === 'watching' ? 2 : 1);
   }));
+  // Discovery is for new titles only: remove anything already saved, regardless of status or rating.
+  const catalogResults = (results || []).filter(anime => !isInCollection(anime));
+  const catalogRecommendations = (recommendationSource || []).filter(anime => !isInCollection(anime));
   const preferredGenres = Object.entries(genreAffinity).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name]) => name);
-  const feature = results[0] || null;
-  const recommendations = (recommendationSource || [])
-    .filter(anime => !isInCollection(anime) && !(results || []).some(result => String(result.mal_id) === String(anime.mal_id)))
+  const feature = catalogResults[0] || null;
+  const catalogIds = new Set(catalogResults.map(anime => String(anime.mal_id)));
+  const recommendations = catalogRecommendations
+    .filter(anime => !catalogIds.has(String(anime.mal_id)))
     .map(anime => ({
       ...anime,
       _matchedGenres: (anime.genres || []).filter(genre => preferredGenres.includes(genre)),
@@ -1212,7 +1216,7 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
     .filter(anime => preferredGenres.length ? anime._matchScore > 0 : true)
     .sort((a, b) => b._matchScore - a._matchScore || Number(b.score_external || 0) - Number(a.score_external || 0))
     .slice(0, 6);
-  const genreArtworkPool = [...(recommendationSource || []), ...(results || [])];
+  const genreArtworkPool = [...catalogRecommendations, ...catalogResults];
   const isGenreResult = tab === 'genre';
   const activeTab = isGenreResult ? 'genres' : tab;
   const feedTitle = tab === 'season' ? 'Em alta nesta temporada'
@@ -1348,9 +1352,12 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
               <DiscoverShelf
                 title={feedTitle}
                 subtitle={tab === 'season' ? 'Títulos que fazem parte da temporada de animes atual.' : tab === 'popular' ? 'Ranking geral de popularidade do catálogo.' : tab === 'upcoming' ? 'Obras anunciadas para temporadas futuras.' : 'Títulos classificados neste gênero.'}
-                items={results.filter(anime => String(anime.mal_id) !== String(feature?.mal_id))}
+                items={catalogResults.filter(anime => String(anime.mal_id) !== String(feature?.mal_id))}
                 findInCollection={findInCollection}
                 lists={lists}
+                hasMore={hasMore}
+                moreLoading={moreLoading}
+                onLoadMore={onLoadMore}
                 onOpenAnime={onOpenAnime}
                 onAdd={onAdd}
                 onAddToList={onAddToList}
@@ -1374,63 +1381,74 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
   );
 }
 
-function DiscoverShelf({ title, subtitle, items, findInCollection, lists, onOpenAnime, onAdd, onAddToList, reasonFor }) {
+function DiscoverShelf({ title, subtitle, items, findInCollection, lists, hasMore = false, moreLoading = false, onLoadMore, onOpenAnime, onAdd, onAddToList, reasonFor }) {
   const [openMenu, setOpenMenu] = useState(null);
-  if (!items?.length) return null;
+  if (!items?.length && !hasMore) return null;
   return (
     <section className="shelf-section discover-shelf">
       <div className="section-heading">
         <div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>
-        <span className="catalog-count">{items.length} títulos</span>
+        <span className="catalog-count">{items?.length || 0} títulos{hasMore ? ' · mais disponíveis' : ''}</span>
       </div>
-      <div className="poster-rail discover-poster-rail">
-        {items.map(anime => {
-          const existing = findInCollection(anime);
-          const statusText = existing ? statusLabel(existing.status) : '';
-          return (
-            <article className="discover-poster-item" key={anime.mal_id}>
-              <button className="poster-card discover-poster-card" onClick={() => onOpenAnime(anime)} title={displayTitle(anime)}>
-                <div className="poster-art">
-                  {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <div className="poster-fallback"><Clapperboard size={25} /></div>}
-                  {anime.score_external && <span className="poster-rating"><Star size={10} fill="currentColor" />{Number(anime.score_external).toFixed(1).replace('.', ',')}</span>}
-                </div>
-                <span className="poster-name">{displayTitle(anime)}</span>
-                <span className="poster-meta">{anime.year || 'Ano não informado'}{anime.format ? ' · ' + localizedFormat(anime.format) : ''}</span>
-              </button>
-              {reasonFor && <span className="discover-reason">{reasonFor(anime)}</span>}
-              {existing ? (
-                <span className={'discover-added-status tone-' + statusTone(existing.status)}>{statusText} <Check size={12} /></span>
-              ) : (
-                <div className="discover-add-wrap">
-                  <button className="discover-add" onClick={() => setOpenMenu(current => current === String(anime.mal_id) ? null : String(anime.mal_id))} aria-expanded={openMenu === String(anime.mal_id)}>
-                    <Plus size={13} />Adicionar
-                  </button>
-                  {openMenu === String(anime.mal_id) && (
-                    <div className="discover-add-menu">
-                      <span className="discover-menu-heading">Adicionar com status</span>
-                      {[
-                        ['planned', 'Quero assistir'],
-                        ['watching', 'Assistindo'],
-                        ['completed', 'Assistido']
-                      ].map(([status, label]) => (
-                        <button key={status} onClick={() => { setOpenMenu(null); onAdd(anime, status); }}>{label}</button>
-                      ))}
-                      {lists?.length > 0 && (
-                        <>
-                          <span className="discover-menu-heading discover-menu-divider">Adicionar a uma lista</span>
-                          {lists.map(list => (
-                            <button key={list.id} onClick={() => { setOpenMenu(null); onAddToList(anime, list.id); }}>{list.name}</button>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </article>
-          );
-        })}
-      </div>
+      {items?.length ? (
+        <div className="poster-rail discover-poster-rail">
+          {items.map(anime => {
+            const existing = findInCollection(anime);
+            const statusText = existing ? statusLabel(existing.status) : '';
+            return (
+              <article className="discover-poster-item" key={anime.mal_id}>
+                <button className="poster-card discover-poster-card" onClick={() => onOpenAnime(anime)} title={displayTitle(anime)}>
+                  <div className="poster-art">
+                    {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <div className="poster-fallback"><Clapperboard size={25} /></div>}
+                    {anime.score_external && <span className="poster-rating"><Star size={10} fill="currentColor" />{Number(anime.score_external).toFixed(1).replace('.', ',')}</span>}
+                  </div>
+                  <span className="poster-name">{displayTitle(anime)}</span>
+                  <span className="poster-meta">{anime.year || 'Ano não informado'}{anime.format ? ' · ' + localizedFormat(anime.format) : ''}</span>
+                </button>
+                {reasonFor && <span className="discover-reason">{reasonFor(anime)}</span>}
+                {existing ? (
+                  <span className={'discover-added-status tone-' + statusTone(existing.status)}>{statusText} <Check size={12} /></span>
+                ) : (
+                  <div className="discover-add-wrap">
+                    <button className="discover-add" onClick={() => setOpenMenu(current => current === String(anime.mal_id) ? null : String(anime.mal_id))} aria-expanded={openMenu === String(anime.mal_id)}>
+                      <Plus size={13} />Adicionar
+                    </button>
+                    {openMenu === String(anime.mal_id) && (
+                      <div className="discover-add-menu">
+                        <span className="discover-menu-heading">Adicionar com status</span>
+                        {[
+                          ['planned', 'Quero assistir'],
+                          ['watching', 'Assistindo'],
+                          ['completed', 'Assistido']
+                        ].map(([status, label]) => (
+                          <button key={status} onClick={() => { setOpenMenu(null); onAdd(anime, status); }}>{label}</button>
+                        ))}
+                        {lists?.length > 0 && (
+                          <>
+                            <span className="discover-menu-heading discover-menu-divider">Adicionar a uma lista</span>
+                            {lists.map(list => (
+                              <button key={list.id} onClick={() => { setOpenMenu(null); onAddToList(anime, list.id); }}>{list.name}</button>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="discover-feed-empty">Todos os títulos desta página já estão na sua biblioteca. Carregue mais para encontrar novos animes.</p>
+      )}
+      {hasMore && (
+        <div className="discover-load-more">
+          <button className="outline-button" type="button" onClick={onLoadMore} disabled={moreLoading}>
+            {moreLoading ? <><LoaderCircle size={15} className="spin" />Carregando...</> : <>Ver mais animes <ChevronDown size={15} /></>}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

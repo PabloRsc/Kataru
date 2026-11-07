@@ -749,3 +749,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hero-up-to-date { display: inline-flex; align-items: center; min-height: 36px; padding: 0 2px; color: #BEE8D1; font-size: 9px; font-weight: 650; }
 .toast-error { color: #FFE0E4; background: #592C37; border-color: #A35464; }
 .toast-error svg { color: #FFB8C3; }
+
+
+/* Seletor de títulos já cadastrados ao preencher uma lista */
+.target-list-name { display: inline-block; margin-top: 5px; color: #C4B9FF; font-size: 10px; font-weight: 700; }
+.library-picker-section { margin: 12px 0 16px; padding: 12px; background: #161923; border: 1px solid #34394B; border-radius: 9px; }
+.library-picker-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+.library-picker-heading > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.library-picker-heading strong { color: var(--text); font-size: 10px; }
+.library-picker-heading span { color: var(--muted-2); font-size: 8px; }
+.library-picker-heading > span { color: #9F94E8; font-size: 7px; font-weight: 800; letter-spacing: .6px; white-space: nowrap; }
+.library-picker-list { max-height: min(34vh, 300px); }
+.library-picker-empty { padding: 17px 8px; color: var(--muted-2); text-align: center; font-size: 9px; line-height: 1.5; }
+.library-picker-more { margin: 8px 0 0; color: var(--muted-2); font-size: 8px; }
+@media (max-width: 600px) {
+  .library-picker-section { padding: 8px; }
+  .library-picker-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .library-picker-list { max-height: 29dvh; }
+  .library-picker-list .result-row { gap: 7px; }
+  .library-picker-list .result-row .outline-button { max-width: 105px; white-space: normal; line-height: 1.25; }
+}

@@ -1082,3 +1082,63 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .discover-reason { font-size: 7px; }
   .discover-page .section-heading h2 { font-size: 16px; }
 }
+
+
+/* Ajustes finais do destaque da Home solicitados na revisão visual */
+.continue-copy .hero-kicker { color: var(--yellow); }
+.continue-copy { max-width: min(68%, 760px); }
+.continue-episode-count { margin: -5px 0 0; color: #D0D0DC; font-size: 12px; }
+.continue-copy .hero-progress { width: min(390px, 100%); margin-top: 12px; }
+.continue-copy .hero-actions { margin-top: 17px; }
+.continue-poster { margin-right: 34px; }
+.continue-side-control {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 54px;
+  padding: 0;
+  color: #F5F2FF;
+  background: rgba(8,10,16,.48);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 99px;
+  backdrop-filter: blur(8px);
+  transform: translateY(-50%);
+  transition: background .18s, border-color .18s, transform .18s;
+}
+.continue-side-control:hover {
+  color: #fff;
+  background: rgba(139,124,255,.5);
+  border-color: rgba(199,190,255,.5);
+}
+.continue-side-prev { left: 12px; }
+.continue-side-next { right: 12px; }
+.continue-controls { display: none; }
+.home-summary div { align-items: center; text-align: center; }
+.home-summary strong, .home-summary span { width: 100%; text-align: center; }
+
+@media (max-width: 780px) {
+  .continue-poster { margin-right: 28px; }
+  .continue-side-prev { left: 8px; }
+  .continue-side-next { right: 8px; }
+  .continue-side-control { width: 32px; height: 46px; }
+}
+@media (max-width: 600px) {
+  .continue-hero { padding: 19px 42px 48px 37px; }
+  .continue-copy { max-width: calc(100% - 100px); }
+  .continue-copy .hero-kicker { font-size: 7px; letter-spacing: .7px; }
+  .continue-title { font-size: 22px; }
+  .continue-episode-count { margin-top: -4px; font-size: 9px; }
+  .continue-copy .hero-progress { gap: 8px; margin-top: 8px; }
+  .continue-copy .hero-progress > div { min-width: 0; }
+  .continue-copy .hero-progress small { font-size: 7px; }
+  .continue-copy .hero-actions { gap: 10px; margin-top: 12px; }
+  .continue-copy .hero-actions .primary-button { min-height: 32px; padding-inline: 8px; font-size: 8px; }
+  .continue-copy .hero-secondary { font-size: 8px; }
+  .continue-poster { width: 88px; margin-right: 8px; }
+  .continue-side-control { width: 27px; height: 40px; }
+  .continue-side-prev { left: 5px; }
+  .continue-side-next { right: 5px; }
+}

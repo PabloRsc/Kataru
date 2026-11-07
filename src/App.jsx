@@ -32,8 +32,9 @@ const EMPTY_FORM = {
 };
 
 const DISCOVER_TABS = [
+  { id: 'season', label: 'Temporada atual' },
   { id: 'popular', label: 'Em alta' },
-  { id: 'top-rated', label: 'Mais bem avaliados' },
+  { id: 'upcoming', label: 'Próximos lançamentos' },
   { id: 'genres', label: 'Gêneros' }
 ];
 
@@ -102,8 +103,9 @@ export default function App() {
   const [toastActionBusy, setToastActionBusy] = useState(false);
   const toastTimerRef = useRef(null);
   const [loading, setLoading] = useState(true);
-  const [discoverTab, setDiscoverTab] = useState('popular');
+  const [discoverTab, setDiscoverTab] = useState('season');
   const [discoverResults, setDiscoverResults] = useState([]);
+  const [discoverRecommendations, setDiscoverRecommendations] = useState([]);
   const [discoverGenres, setDiscoverGenres] = useState([]);
   const [discoverGenre, setDiscoverGenre] = useState(null);
   const [discoverLoading, setDiscoverLoading] = useState(false);
@@ -196,18 +198,36 @@ export default function App() {
     let active = true;
     setDiscoverLoading(true);
     setDiscoverError('');
+
     if (discoverTab === 'genres') {
-      fetchAnimeGenres()
-        .then(data => { if (active) setDiscoverGenres(data || []); })
-        .catch(error => { if (active) setDiscoverError(error.message || 'Não foi possível carregar os gêneros.'); })
+      Promise.all([fetchAnimeGenres(), discoverAnime('popular')])
+        .then(([genres, recommendations]) => {
+          if (!active) return;
+          setDiscoverGenres(genres || []);
+          setDiscoverRecommendations(recommendations || []);
+          setDiscoverResults([]);
+        })
+        .catch(error => {
+          if (active) setDiscoverError(error.message || 'Não foi possível carregar os gêneros.');
+        })
         .finally(() => { if (active) setDiscoverLoading(false); });
     } else {
       const kind = discoverTab === 'genre' && discoverGenre
         ? 'genre-' + encodeURIComponent(discoverGenre.name || discoverGenre.mal_id || '')
         : discoverTab;
-      discoverAnime(kind)
-        .then(data => { if (active) setDiscoverResults(data || []); })
-        .catch(error => { if (active) setDiscoverError(error.message || 'Não foi possível carregar o catálogo.'); })
+      const recommendationRequest = discoverTab === 'popular'
+        ? Promise.resolve(null)
+        : discoverAnime('popular');
+
+      Promise.all([discoverAnime(kind), recommendationRequest])
+        .then(([data, recommendations]) => {
+          if (!active) return;
+          setDiscoverResults(data || []);
+          setDiscoverRecommendations(discoverTab === 'popular' ? (data || []) : (recommendations || []));
+        })
+        .catch(error => {
+          if (active) setDiscoverError(error.message || 'Não foi possível carregar o catálogo.');
+        })
         .finally(() => { if (active) setDiscoverLoading(false); });
     }
     return () => { active = false; };
@@ -746,6 +766,7 @@ export default function App() {
             tab={discoverTab}
             setTab={value => { setDiscoverTab(value); setDiscoverGenre(null); }}
             results={discoverResults}
+            recommendations={discoverRecommendations}
             genres={discoverGenres}
             loading={discoverLoading}
             error={discoverError}
@@ -875,49 +896,49 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
 }
 
 function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd }) {
-  const featured = watching[0] || null;
-  const currentEpisode = Number(featured?.episode_current || 0);
-  const expectedTotal = featured && !isCurrentlyAiring(featured) ? totalEpisodes(featured) : null;
-  const available = featured ? episodeProgressLimit(featured) : null;
-  const nextEpisode = currentEpisode + 1;
-  const canMarkNext = Boolean(featured && (available ? currentEpisode < available : expectedTotal ? currentEpisode < expectedTotal : false));
-  const progressTotal = expectedTotal || available;
-  const progress = progressTotal ? Math.min(100, Math.round((currentEpisode / progressTotal) * 100)) : 0;
+  const [featuredIndex, setFeaturedIndex] = useState(0);
+  const featured = watching[featuredIndex] || watching[0] || null;
+
+  useEffect(() => {
+    if (watching.length < 2) {
+      setFeaturedIndex(0);
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      setFeaturedIndex(current => (current + 1) % watching.length);
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [watching.length]);
+
+  useEffect(() => {
+    if (featuredIndex >= watching.length) setFeaturedIndex(0);
+  }, [featuredIndex, watching.length]);
 
   return (
     <div className="home-page">
-      <div className="home-welcome">
-        <div>
-          <p className="eyebrow">SEU ESPAÇO DE ANIMES</p>
-          <h1>Seu universo, <span>organizado.</span></h1>
-          <p>Acompanhe suas histórias favoritas e descubra o que assistir depois.</p>
-        </div>
-        <div className="home-summary">
-          <div><strong>{counts.completed || 0}</strong><span>assistidos</span></div>
-          <div><strong>{counts.watching || 0}</strong><span>assistindo</span></div>
-          <div><strong>{counts.planned || 0}</strong><span>quero assistir</span></div>
-          <div><strong>{counts.dropped || 0}</strong><span>abandonados</span></div>
-        </div>
-      </div>
-
       {featured ? (
-        <section className="continue-hero" style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,17,23,.98) 0%, rgba(15,17,23,.83) 40%, rgba(15,17,23,.2) 100%), url("' + (featured.image_url || '') + '")' }}>
-          <div className="hero-copy">
+        <section className="continue-hero">
+          <div
+            className="continue-backdrop"
+            aria-hidden="true"
+            style={featured.image_url ? { backgroundImage: 'url("' + featured.image_url + '")' } : undefined}
+          />
+          <div className="continue-copy">
             <span className="hero-kicker"><Zap size={13} fill="currentColor" /> CONTINUE DE ONDE PAROU</span>
-            <h2>{displayTitle(featured)}</h2>
-            <p>{expectedTotal ? expectedTotal + ' episódios' : available ? available + (isCurrentlyAiring(featured) ? ' episódios lançados até agora' : ' episódios') : 'Série em andamento'}</p>
-            <div className="hero-progress">
-              <div><span style={{ width: progress + '%' }} /></div>
-              <small>{expectedTotal ? 'EP. ' + currentEpisode + ' / ' + expectedTotal : available ? 'EP. ' + currentEpisode + ' / ' + available + (isCurrentlyAiring(featured) ? ' lançados' : '') : 'EP. ' + currentEpisode}</small>
-            </div>
-            <div className="hero-actions">
-              {canMarkNext
-                ? <button className="primary-button" onClick={() => onQuickEpisode(featured)}><Check size={15} />Marcar ep. {nextEpisode} como visto</button>
-                : <span className="hero-up-to-date">{available && currentEpisode >= available ? 'Você está em dia com os episódios lançados.' : 'O catálogo ainda não confirmou o próximo episódio.'}</span>}
-              <button className="hero-secondary" onClick={() => onOpenAnime(featured)}>Ver detalhes <ArrowRight size={15} /></button>
-            </div>
+            <button className="continue-title" onClick={() => onOpenAnime(featured)}>{displayTitle(featured)}</button>
           </div>
-          <div className="hero-art-label">{featured.title}</div>
+          <button className="continue-poster" onClick={() => onOpenAnime(featured)} aria-label={'Abrir ' + displayTitle(featured)}>
+            {featured.image_url
+              ? <img src={featured.image_url} alt={'Capa de ' + displayTitle(featured)} />
+              : <span><Clapperboard size={34} /></span>}
+          </button>
+          {watching.length > 1 && (
+            <div className="continue-controls" aria-label="Navegar entre animes em andamento">
+              <button onClick={() => setFeaturedIndex(current => (current - 1 + watching.length) % watching.length)} aria-label="Anime anterior"><ChevronLeft size={17} /></button>
+              <span>{(featuredIndex % watching.length) + 1} / {watching.length}</span>
+              <button onClick={() => setFeaturedIndex(current => (current + 1) % watching.length)} aria-label="Próximo anime"><ChevronRight size={17} /></button>
+            </div>
+          )}
         </section>
       ) : (
         <section className="welcome-hero">
@@ -931,6 +952,13 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
           <div className="welcome-symbol"><Clapperboard size={58} strokeWidth={1.1} /></div>
         </section>
       )}
+
+      <div className="home-summary" aria-label="Resumo da biblioteca">
+        <div><strong>{counts.completed || 0}</strong><span>assistidos</span></div>
+        <div><strong>{counts.watching || 0}</strong><span>assistindo</span></div>
+        <div><strong>{counts.planned || 0}</strong><span>quero assistir</span></div>
+        <div><strong>{counts.dropped || 0}</strong><span>abandonados</span></div>
+      </div>
 
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Preparando sua biblioteca...</div> : (
         <>
@@ -1038,7 +1066,7 @@ function AnimeRow({ anime, onClick }) {
   );
 }
 
-function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGenre, collection, onRetry, onSelectGenre, onOpenAnime, onAdd, isInCollection }) {
+function DiscoverPage({ tab, setTab, results, recommendations: recommendationSource, genres, loading, error, selectedGenre, collection, onRetry, onSelectGenre, onOpenAnime, onAdd, isInCollection }) {
   const [genreQuery, setGenreQuery] = useState('');
   const shownGenres = genres.filter(genre => String(genre.name || '').toLowerCase().includes(genreQuery.toLowerCase()));
   const genreAffinity = {};
@@ -1046,55 +1074,124 @@ function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGe
     genreAffinity[genre] = (genreAffinity[genre] || 0) + (anime.status === 'completed' || anime.status === 'watching' ? 2 : 1);
   }));
   const preferredGenres = Object.entries(genreAffinity).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name]) => name);
-  const recommendations = results
-    .filter(anime => !isInCollection(anime) && String(anime.mal_id) !== String(results[0]?.mal_id))
-    .map(anime => ({ ...anime, _matchScore: (anime.genres || []).filter(genre => preferredGenres.includes(genre)).length }))
-    .filter(anime => anime._matchScore > 0)
+  const feature = results[0] || null;
+  const recommendations = (recommendationSource || [])
+    .filter(anime => !isInCollection(anime) && String(anime.mal_id) !== String(feature?.mal_id))
+    .map(anime => ({
+      ...anime,
+      _matchedGenres: (anime.genres || []).filter(genre => preferredGenres.includes(genre)),
+      _matchScore: (anime.genres || []).filter(genre => preferredGenres.includes(genre)).length
+    }))
+    .filter(anime => preferredGenres.length ? anime._matchScore > 0 : true)
     .sort((a, b) => b._matchScore - a._matchScore || Number(b.score_external || 0) - Number(a.score_external || 0))
-    .slice(0, 4);
-  const title = tab === 'popular' ? 'Em alta no catálogo' : tab === 'top-rated' ? 'Mais bem avaliados' : tab === 'genre' ? selectedGenre?.name || 'Gênero' : 'Catálogo';
-  const feature = results[0];
-  const gridResults = feature ? results.slice(1) : results;
-  const categoryDescription = tab === 'popular'
-    ? 'Animes populares entre os títulos mais procurados do catálogo.'
-    : tab === 'top-rated'
-      ? 'Animes com as maiores avaliações gerais do catálogo.'
-      : tab === 'genre'
-        ? 'Títulos classificados no gênero ' + (selectedGenre?.name || '') + '.'
-        : 'Explore o catálogo por estilos como ação, comédia, fantasia, romance e mistério.';
+    .slice(0, 6);
+
+  const isGenreResult = tab === 'genre';
+  const activeTab = isGenreResult ? 'genres' : tab;
+  const feedTitle = tab === 'season' ? 'Em alta nesta temporada'
+    : tab === 'popular' ? 'Mais populares'
+      : tab === 'upcoming' ? 'Próximos lançamentos'
+        : isGenreResult ? 'Animes de ' + (selectedGenre?.name || 'gênero')
+          : 'Descubra por gênero';
+  const featureLabel = tab === 'season' ? 'TEMPORADA ATUAL'
+    : tab === 'popular' ? 'MAIS POPULARES'
+      : tab === 'upcoming' ? 'EM BREVE'
+        : 'GÊNERO EM DESTAQUE';
 
   return (
     <div className="discover-page">
       <PageIntro eyebrow="EXPLORE NOVAS HISTÓRIAS" title="Descobrir" subtitle="Encontre seu próximo anime favorito." />
-      <div className="discover-tabs">{DISCOVER_TABS.map(item => <button key={item.id} className={tab === item.id || (tab === 'genre' && item.id === 'genres') ? 'discover-tab active' : 'discover-tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-      <p className="discover-category-description">{categoryDescription}</p>
+      <div className="discover-tabs" role="tablist" aria-label="Categorias de descoberta">
+        {DISCOVER_TABS.map(item => (
+          <button
+            key={item.id}
+            role="tab"
+            aria-selected={activeTab === item.id}
+            className={activeTab === item.id ? 'discover-tab active' : 'discover-tab'}
+            onClick={() => setTab(item.id)}
+          >{item.label}</button>
+        ))}
+      </div>
 
       {tab === 'genres' ? (
         <>
-          <div className="discover-section-heading"><div><h2>Explore por gênero</h2><p>Escolha um estilo e descubra novos títulos.</p></div></div>
+          <div className="discover-section-heading"><div><h2>Explore por gênero</h2><p>Escolha um estilo para ver os títulos do catálogo.</p></div></div>
           <label className="search-field genre-search"><Search size={16} /><input value={genreQuery} onChange={event => setGenreQuery(event.target.value)} placeholder="Buscar gênero" /></label>
           {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando gêneros...</div> : error ? <CatalogError message={error} onRetry={onRetry} /> : (
-            <div className="genre-grid">{shownGenres.map(genre => <button key={genre.name || genre.mal_id} className="genre-card" onClick={() => onSelectGenre(genre)}><span>{genre.name}</span><ArrowUpRightIcon /></button>)}</div>
+            <div className="genre-grid">{shownGenres.map(genre => (
+              <button key={genre.name || genre.mal_id} className="genre-card" onClick={() => onSelectGenre(genre)}>
+                <span>{genre.name}</span><ArrowUpRightIcon />
+              </button>
+            ))}</div>
+          )}
+          {!loading && !error && recommendations.length > 0 && (
+            <DiscoverShelf
+              title="Recomendados para você"
+              subtitle={preferredGenres.length ? 'Sugestões relacionadas aos gêneros da sua biblioteca.' : 'Títulos populares para começar a explorar.'}
+              items={recommendations}
+              collectionCheck={isInCollection}
+              onOpenAnime={onOpenAnime}
+              onAdd={onAdd}
+              reasonFor={anime => anime._matchedGenres?.length ? 'Combina com ' + anime._matchedGenres.slice(0, 2).join(' e ') : 'Popular no catálogo'}
+            />
           )}
         </>
       ) : (
         <>
-          {tab === 'genre' && <div className="genre-context"><span>GÊNERO SELECIONADO</span><strong>{selectedGenre?.name}</strong><button onClick={() => setTab('genres')}>Trocar gênero <ChevronRight size={13} /></button></div>}
+          {isGenreResult && (
+            <div className="genre-context">
+              <span>GÊNERO SELECIONADO</span><strong>{selectedGenre?.name}</strong>
+              <button onClick={() => setTab('genres')}>Trocar gênero <ChevronRight size={13} /></button>
+            </div>
+          )}
           {loading ? <div className="loading-block"><LoaderCircle className="spin" />Explorando o catálogo...</div> : error ? <CatalogError message={error} onRetry={onRetry} /> : (
             <>
               {feature && (
-                <section className="discover-feature" style={{ backgroundImage: 'linear-gradient(90deg, rgba(15,17,23,.98) 0%, rgba(15,17,23,.82) 46%, rgba(15,17,23,.22) 100%), url("' + (feature.image_url || '') + '")' }}>
-                  <div className="feature-copy"><span className="feature-tag"><Sparkles size={12} /> {tab === 'top-rated' ? 'MAIS BEM AVALIADOS' : tab === 'popular' ? 'EM ALTA' : 'GÊNERO EM DESTAQUE'}</span><h2>{displayTitle(feature)}</h2><p>{feature.synopsis || 'Uma nova história para adicionar à sua lista.'}</p><div className="feature-meta"><span>{feature.year || 'Ano não informado'}</span>{feature.format && <><i>·</i><span>{feature.format}</span></>}{feature.score_external && <><i>·</i><span><Star size={12} fill="currentColor" />{Number(feature.score_external).toFixed(1)}</span></>}</div><div className="hero-actions"><button className="primary-button" onClick={() => onOpenAnime(feature)}><Plus size={15} />{isInCollection(feature) ? 'Ver na biblioteca' : 'Quero assistir'}</button></div></div>
+                <section className="discover-feature">
+                  <div
+                    className="discover-feature-backdrop"
+                    aria-hidden="true"
+                    style={feature.image_url ? { backgroundImage: 'url("' + feature.image_url + '")' } : undefined}
+                  />
+                  <div className="feature-copy">
+                    <span className="feature-tag"><Sparkles size={12} /> {featureLabel}</span>
+                    <h2>{displayTitle(feature)}</h2>
+                    <p>{feature.synopsis || 'Uma nova história para adicionar à sua lista.'}</p>
+                    <div className="feature-meta">
+                      <span>{feature.year || 'Ano não informado'}</span>
+                      {feature.format && <><i>·</i><span>{feature.format}</span></>}
+                      {feature.score_external && <><i>·</i><span><Star size={12} fill="currentColor" />{Number(feature.score_external).toFixed(1)}</span></>}
+                    </div>
+                    <div className="hero-actions">
+                      <button className="primary-button" onClick={() => onAdd(feature)} disabled={isInCollection(feature)}>
+                        <Plus size={15} />{isInCollection(feature) ? 'Na biblioteca' : 'Quero assistir'}
+                      </button>
+                      <button className="hero-secondary" onClick={() => onOpenAnime(feature)}>Ver detalhes <ArrowRight size={15} /></button>
+                    </div>
+                  </div>
+                  <button className="discover-feature-poster" onClick={() => onOpenAnime(feature)} aria-label={'Ver ' + displayTitle(feature)}>
+                    {feature.image_url ? <img src={feature.image_url} alt={'Capa de ' + displayTitle(feature)} /> : <Clapperboard size={35} />}
+                  </button>
                 </section>
               )}
-              {recommendations.length > 0 && (
-                <section className="personalized-section">
-                  <div className="section-heading"><div><h2>Recomendados para você</h2><p>Seleções que combinam com os gêneros da sua biblioteca: {preferredGenres.slice(0, 3).join(' · ')}.</p></div><span className="personalized-label"><Sparkles size={12} /> PARA VOCÊ</span></div>
-                  <div className="discover-grid personalized-grid">{recommendations.map(anime => <DiscoverCard key={'recommended-' + anime.mal_id} anime={anime} exists={false} onOpen={() => onOpenAnime(anime)} onAdd={() => onAdd(anime)} />)}</div>
-                </section>
-              )}
-              <div className="section-heading discover-results-heading"><div><h2>{title}</h2><p>{categoryDescription}</p></div><span className="catalog-count">{results.length} títulos</span></div>
-              {gridResults.length ? <div className="discover-grid">{gridResults.map(anime => <DiscoverCard key={anime.mal_id} anime={anime} exists={isInCollection(anime)} onOpen={() => onOpenAnime(anime)} onAdd={() => onAdd(anime)} />)}</div> : results.length ? null : <div className="empty-state"><h2>Nenhum título encontrado</h2><p>O catálogo não retornou resultados para esta seleção.</p></div>}
+
+              <DiscoverShelf
+                title={feedTitle}
+                subtitle={tab === 'season' ? 'Títulos que fazem parte da temporada de animes atual.' : tab === 'popular' ? 'Ranking geral de popularidade do catálogo.' : tab === 'upcoming' ? 'Obras anunciadas para temporadas futuras.' : 'Títulos classificados neste gênero.'}
+                items={results}
+                collectionCheck={isInCollection}
+                onOpenAnime={onOpenAnime}
+                onAdd={onAdd}
+              />
+              <DiscoverShelf
+                title="Recomendados para você"
+                subtitle={preferredGenres.length ? 'Sugestões relacionadas aos gêneros presentes na sua biblioteca.' : 'Títulos populares selecionados para você começar a explorar.'}
+                items={recommendations}
+                collectionCheck={isInCollection}
+                onOpenAnime={onOpenAnime}
+                onAdd={onAdd}
+                reasonFor={anime => anime._matchedGenres?.length ? 'Combina com ' + anime._matchedGenres.slice(0, 2).join(' e ') : 'Popular no catálogo'}
+              />
             </>
           )}
         </>
@@ -1103,25 +1200,40 @@ function DiscoverPage({ tab, setTab, results, genres, loading, error, selectedGe
   );
 }
 
-function ArrowUpRightIcon() { return <ArrowRight size={17} />; }
-
-function DiscoverCard({ anime, exists, onOpen, onAdd }) {
+function DiscoverShelf({ title, subtitle, items, collectionCheck, onOpenAnime, onAdd, reasonFor }) {
+  if (!items?.length) return null;
   return (
-    <article className="discover-card">
-      <button className="discover-card-main" onClick={onOpen}>
-        <div className="discover-card-art">{anime.image_url ? <img src={anime.image_url} alt={displayTitle(anime)} loading="lazy" /> : <Clapperboard size={28} />}</div>
-        <div className="discover-card-info">
-          <strong>{displayTitle(anime)}</strong>
-          <span>{anime.year || 'Ano não informado'}{anime.format ? ' · ' + anime.format : ''}</span>
-          {anime.score_external && <small><Star size={11} fill="currentColor" /> {Number(anime.score_external).toFixed(1)}</small>}
-        </div>
-      </button>
-      <button className={exists ? 'discover-add added' : 'discover-add'} onClick={onAdd} disabled={exists}>
-        {exists ? <><Check size={13} />Na biblioteca</> : <><Plus size={13} />Adicionar à biblioteca</>}
-      </button>
-    </article>
+    <section className="shelf-section discover-shelf">
+      <div className="section-heading">
+        <div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>
+        <span className="catalog-count">{items.length} títulos</span>
+      </div>
+      <div className="poster-rail discover-poster-rail">
+        {items.map(anime => {
+          const exists = collectionCheck(anime);
+          return (
+            <article className="discover-poster-item" key={anime.mal_id}>
+              <button className="poster-card discover-poster-card" onClick={() => onOpenAnime(anime)} title={displayTitle(anime)}>
+                <div className="poster-art">
+                  {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <div className="poster-fallback"><Clapperboard size={25} /></div>}
+                  {anime.score_external && <span className="poster-rating"><Star size={10} fill="currentColor" />{Number(anime.score_external).toFixed(1)}</span>}
+                </div>
+                <span className="poster-name">{displayTitle(anime)}</span>
+                <span className="poster-meta">{anime.year || 'Ano não informado'}{anime.format ? ' · ' + anime.format : ''}</span>
+              </button>
+              {reasonFor && <span className="discover-reason">{reasonFor(anime)}</span>}
+              <button className={exists ? 'discover-add added' : 'discover-add'} onClick={() => onAdd(anime)} disabled={exists}>
+                {exists ? <><Check size={13} />Na biblioteca</> : <><Plus size={13} />Adicionar</>}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
+
+function ArrowUpRightIcon() { return <ArrowRight size={17} />; }
 
 function CatalogError({ message, onRetry }) {
   return <div className="catalog-error"><div><Compass size={22} /><strong>Catálogo indisponível no momento</strong><p>{message}</p><button className="outline-button" onClick={onRetry}>Tentar novamente</button></div></div>;

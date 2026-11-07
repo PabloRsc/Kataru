@@ -79,10 +79,22 @@ export async function fetchAnimeGenres() {
 
 // The catalogue is fetched on demand; it only enters the collection after an explicit add action.
 export function normalizeAnime(a = {}) {
+  const title = a.title || a.title_japanese || 'Sem título';
+  const titleEnglish = a.title_english || '';
+  const titleJapanese = a.title_japanese || '';
+  const titleSynonyms = Array.isArray(a.title_synonyms) ? a.title_synonyms : [];
+  const titleAliases = [...new Set([
+    title,
+    titleEnglish,
+    titleJapanese,
+    ...titleSynonyms
+  ].map(value => String(value || '').trim()).filter(Boolean))];
   return {
     mal_id: a.mal_id,
-    title: a.title || a.title_japanese || 'Sem título',
-    title_english: a.title_english || '',
+    title,
+    title_english: titleEnglish,
+    title_japanese: titleJapanese,
+    title_aliases: titleAliases,
     image_url: a.images?.webp?.large_image_url || a.images?.webp?.image_url || a.images?.jpg?.large_image_url || a.images?.jpg?.image_url || '',
     synopsis: a.synopsis || '',
     episodes_total: a.episodes ?? null,

@@ -62,7 +62,8 @@ const shortDate = value => {
 
 const displayTitle = anime => anime?.display_title?.trim() || anime?.title || 'Sem título';
 const totalEpisodes = anime => Number(anime?.episodes_total_manual || anime?.episodes_total || 0) || null;
-const isCurrentlyAiring = anime => /currently airing|currently_airing|releasing|airing|em exibição/i.test(String(anime?.airing_status || ''));
+const isCurrentlyAiring = anime => ['currently airing', 'currently_airing', 'releasing', 'airing', 'ongoing', 'em exibição']
+  .includes(String(anime?.airing_status || '').trim().toLowerCase());
 const latestAiredEpisode = anime => Number(anime?.episodes_available || 0) || null;
 const episodeProgressLimit = anime => isCurrentlyAiring(anime)
   ? latestAiredEpisode(anime)

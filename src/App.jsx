@@ -956,8 +956,8 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
   const expectedTotal = featured && !isCurrentlyAiring(featured) ? totalEpisodes(featured) : null;
   const available = featured ? episodeProgressLimit(featured) : null;
   const nextEpisode = currentEpisode + 1;
-  const canMarkNext = Boolean(featured && (!progressTotal || currentEpisode < progressTotal));
   const progressTotal = expectedTotal || available;
+  const canMarkNext = Boolean(featured && (!progressTotal || currentEpisode < progressTotal));
   const progress = progressTotal ? Math.min(100, Math.round((currentEpisode / progressTotal) * 100)) : 0;
 
   useEffect(() => {

@@ -111,6 +111,7 @@ export default function App() {
   const [discoverGenre, setDiscoverGenre] = useState(null);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverMoreLoading, setDiscoverMoreLoading] = useState(false);
+  const [discoverMoreError, setDiscoverMoreError] = useState('');
   const [discoverPage, setDiscoverPage] = useState(1);
   const [discoverHasMore, setDiscoverHasMore] = useState(false);
   const [discoverReload, setDiscoverReload] = useState(0);
@@ -202,6 +203,7 @@ export default function App() {
     let active = true;
     setDiscoverLoading(true);
     setDiscoverMoreLoading(false);
+    setDiscoverMoreError('');
     setDiscoverError('');
     setDiscoverResults([]);
     setDiscoverPage(1);
@@ -254,7 +256,7 @@ export default function App() {
       : discoverTab;
     const nextPage = discoverPage + 1;
     setDiscoverMoreLoading(true);
-    setDiscoverError('');
+    setDiscoverMoreError('');
     try {
       const response = await discoverAnime(kind, nextPage);
       setDiscoverResults(current => {
@@ -265,7 +267,7 @@ export default function App() {
       setDiscoverPage(response.page || nextPage);
       setDiscoverHasMore(Boolean(response.hasMore));
     } catch (error) {
-      setDiscoverError(error.message || 'Não foi possível carregar mais animes.');
+      setDiscoverMoreError(error.message || 'Não foi possível carregar mais animes.');
     } finally {
       setDiscoverMoreLoading(false);
     }
@@ -817,6 +819,7 @@ export default function App() {
             loading={discoverLoading}
             hasMore={discoverHasMore}
             moreLoading={discoverMoreLoading}
+            moreError={discoverMoreError}
             onLoadMore={loadMoreDiscover}
             error={discoverError}
             selectedGenre={discoverGenre}
@@ -987,8 +990,8 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
             <p className="continue-episode-count">
               {expectedTotal ? expectedTotal + ' episódios' : available ? available + (isCurrentlyAiring(featured) ? ' episódios lançados até agora' : ' episódios') : 'Série em andamento'}
             </p>
-            <div className="hero-progress">
-              <div><span style={{ width: progress + '%' }} /></div>
+            <div className={progressTotal ? 'hero-progress' : 'hero-progress is-indeterminate'}>
+              <div><span style={{ width: (progressTotal ? progress : 34) + '%' }} /></div>
               <small>{expectedTotal ? 'EP. ' + currentEpisode + ' / ' + expectedTotal : available ? 'EP. ' + currentEpisode + ' / ' + available + (isCurrentlyAiring(featured) ? ' lançados' : '') : 'EP. ' + currentEpisode}</small>
             </div>
             <div className="hero-actions">
@@ -1065,7 +1068,7 @@ function PosterCard({ anime, onClick, compact = false }) {
         <span className={'status-pill tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
         {anime.status !== 'watching' && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
         {anime.status === 'watching' && <>
-          <span className="poster-progress"><i style={{ width: progress + '%' }} /></span>
+          <span className={total ? 'poster-progress' : 'poster-progress is-indeterminate'}><i style={{ width: (total ? progress : 34) + '%' }} /></span>
           <span className="poster-episode-count">EP. {Number(anime.episode_current || 0)}{total ? ' / ' + total : ''}</span>
         </>}
       </div>
@@ -1132,7 +1135,7 @@ function AnimeRow({ anime, onClick }) {
       {anime.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <div className="row-fallback"><Clapperboard size={20} /></div>}
       <span className="row-title"><strong>{displayTitle(anime)}</strong><small>{anime.year || '—'} · {anime.format || 'Anime'}</small></span>
       <span className={'row-status tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
-      <span className="row-progress">{total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}<i><b style={{ width: pct + '%' }} /></i></span>
+      <span className={!total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}<i><b style={{ width: (total ? pct : 34) + '%' }} /></i></span>
       <span className="row-rating">{anime.status !== 'watching' && anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
       <ChevronRight size={16} className="row-chevron" />
     </button>
@@ -1189,7 +1192,7 @@ const genreKey = value => String(value || '').normalize('NFD').replace(/[\u0300-
 const localizedGenre = genre => GENRE_LOCALIZATION[genreKey(genre?.name)] || { label: genre?.name || 'Gênero', accent: '#8B7CFF' };
 const localizedFormat = value => ({ Movie: 'Filme', TV: 'TV', ONA: 'ONA', OVA: 'OVA', Special: 'Especial', Music: 'Música' }[value] || value || 'Anime');
 
-function DiscoverPage({ tab, setTab, results, recommendations: recommendationSource, genres, lists, loading, hasMore, moreLoading, onLoadMore, error, selectedGenre, collection, onRetry, onSelectGenre, onOpenAnime, onAdd, onAddToList, findInCollection, isInCollection }) {
+function DiscoverPage({ tab, setTab, results, recommendations: recommendationSource, genres, lists, loading, hasMore, moreLoading, moreError, onLoadMore, error, selectedGenre, collection, onRetry, onSelectGenre, onOpenAnime, onAdd, onAddToList, findInCollection, isInCollection }) {
   const [genreQuery, setGenreQuery] = useState('');
   const [synopsisExpanded, setSynopsisExpanded] = useState(false);
   const shownGenres = genres.filter(genre => {
@@ -1381,7 +1384,7 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
   );
 }
 
-function DiscoverShelf({ title, subtitle, items, findInCollection, lists, hasMore = false, moreLoading = false, onLoadMore, onOpenAnime, onAdd, onAddToList, reasonFor }) {
+function DiscoverShelf({ title, subtitle, items, findInCollection, lists, hasMore = false, moreLoading = false, moreError = '', onLoadMore, onOpenAnime, onAdd, onAddToList, reasonFor }) {
   const [openMenu, setOpenMenu] = useState(null);
   if (!items?.length && !hasMore) return null;
   return (
@@ -1444,8 +1447,9 @@ function DiscoverShelf({ title, subtitle, items, findInCollection, lists, hasMor
       )}
       {hasMore && (
         <div className="discover-load-more">
+          {moreError && <p className="discover-more-error">{moreError}</p>}
           <button className="outline-button" type="button" onClick={onLoadMore} disabled={moreLoading}>
-            {moreLoading ? <><LoaderCircle size={15} className="spin" />Carregando...</> : <>Ver mais animes <ChevronDown size={15} /></>}
+            {moreLoading ? <><LoaderCircle size={15} className="spin" />Carregando...</> : <>{moreError ? 'Tentar novamente' : 'Ver mais animes'} <ChevronDown size={15} /></>}
           </button>
         </div>
       )}
@@ -1577,7 +1581,7 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
               <div><span className="eyebrow">SEU PROGRESSO</span><strong>{current}<small>{total ? ' / ' + total : available ? ' / ' + available + ' lançados' : ' episódios registrados'}</small></strong><span>episódios assistidos</span></div>
               <div className="progress-ring" style={{ '--progress': progress + '%' }}><strong>{progressTotal ? progress : '—'}<small>{progressTotal ? '%' : ''}</small></strong></div>
             </div>
-            <div className="progress-track"><span style={{ width: progress + '%' }} /></div>
+            <div className={progressTotal ? 'progress-track' : 'progress-track is-indeterminate'}><span style={{ width: (progressTotal ? progress : 34) + '%' }} /></div>
             {total && current >= total && <p className="progress-complete-hint"><Check size={13} />Você chegou ao total de episódios.</p>}
             {available && !total && current >= available && <p className="progress-complete-hint"><Check size={13} />Você está em dia com os episódios lançados.</p>}
             <div className="episode-controls">

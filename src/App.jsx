@@ -1,3 +1,4 @@
+import { KATARU_MARK, KATARU_WORDMARK } from './brand-assets';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft,
@@ -658,8 +659,8 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <button className="brand" onClick={() => navigate('home')} aria-label="Kataru — início">
-          <img className="brand-mark" src="/kataru-mark.png" alt="" />
-          <img className="brand-wordmark" src="/kataru-wordmark.png" alt="Kataru" />
+          <img className="brand-mark" src={KATARU_MARK} alt="" />
+          <img className="brand-wordmark" src={KATARU_WORDMARK} alt="Kataru" />
         </button>
         <nav className="main-nav" aria-label="Navegação principal">
           <button className={page === 'home' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('home')}>Início</button>

@@ -190,7 +190,6 @@ function toRow(anime, ownerId) {
     season: anime.season || null,
     format: anime.format || null,
     genres: anime.genres || [],
-    title_aliases: anime.title_aliases || [],
     studios: anime.studios || [],
     score_external: anime.score_external ?? null,
     status: anime.status || 'planned',

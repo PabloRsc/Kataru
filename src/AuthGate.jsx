@@ -38,7 +38,7 @@ function mailboxUrl(email) {
 
 function Brand({ compact = false }) {
   return (
-    <span className={compact ? 'auth-brand auth-brand-compact' : 'auth-brand'}>
+    <span className={compact ? 'kataru-brand kataru-brand-compact' : 'kataru-brand'}>
       <img className="auth-brand-mark" src={KATARU_MARK} alt="" />
       <img className="auth-brand-word" src={KATARU_WORDMARK} alt="Kataru" />
     </span>

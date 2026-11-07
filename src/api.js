@@ -26,11 +26,9 @@ async function request(path) {
   }
 }
 
-async function requestCatalog(apiPath) {
-  const payload = await request(apiPath);
-  const entries = catalogEntries(payload);
-  if (!entries.length) throw new Error('O catálogo respondeu, mas não retornou títulos para esta categoria.');
-  return entries;
+async function requestCatalog(path) {
+  const data = await request(path);
+  return catalogEntries(data).map(normalizeAnime);
 }
 
 export async function searchAnime(query) {
@@ -43,22 +41,30 @@ export async function fetchAnime(malId) {
   return normalizeAnime(data.data || data);
 }
 
-export async function discoverAnime(kind = 'popular') {
+export async function discoverAnime(kind = 'season') {
   let path;
-  if (kind === 'popular') path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
-  else if (kind === 'top-rated') path = '/api/catalog/top/anime?type=tv&limit=24&sfw=true&ranking=score';
-  else if (String(kind).startsWith('genre-')) {
+  if (kind === 'season') {
+    path = '/api/catalog/seasons/now?filter=tv&limit=24&sfw=true';
+  } else if (kind === 'upcoming') {
+    path = '/api/catalog/seasons/upcoming?filter=tv&limit=24&sfw=true';
+  } else if (kind === 'popular') {
+    path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
+  } else if (kind === 'top-rated') {
+    path = '/api/catalog/top/anime?type=tv&limit=24&sfw=true&ranking=score';
+  } else if (String(kind).startsWith('genre-')) {
     const genre = decodeURIComponent(String(kind).slice(6)).trim();
     if (!genre) throw new Error('Escolha um gênero para continuar.');
     path = '/api/catalog/anime?genre=' + encodeURIComponent(genre) + '&order_by=popularity&sort=asc&limit=24&sfw=true';
-  } else path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
+  } else {
+    path = '/api/catalog/seasons/now?filter=tv&limit=24&sfw=true';
+  }
 
-  return (await requestCatalog(path)).map(normalizeAnime);
+  return requestCatalog(path);
 }
 
 export async function fetchAnimeGenres() {
-  const entries = await requestCatalog('/api/catalog/genres/anime?filter=genres');
-  return entries.map(genre => ({
+  const entries = await request('/api/catalog/genres/anime?filter=genres');
+  return catalogEntries(entries).map(genre => ({
     mal_id: Number.isSafeInteger(Number(genre.mal_id)) ? Number(genre.mal_id) : null,
     name: genre.name
   })).filter(genre => genre.name);

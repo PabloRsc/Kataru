@@ -871,3 +871,214 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .home-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 600px) { .home-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+
+/* Revisão de Início e Descobrir — destaques e prateleiras consistentes */
+.home-welcome { display: none; }
+.continue-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 326px;
+  padding: clamp(24px, 4vw, 54px);
+  margin: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(115deg, #292442, #171B29 72%);
+  border: 1px solid #39334E;
+  border-radius: 16px;
+}
+.continue-backdrop {
+  position: absolute;
+  z-index: -2;
+  inset: -24px;
+  background-position: center 38%;
+  background-size: cover;
+  filter: blur(24px);
+  opacity: .48;
+  transform: scale(1.08);
+}
+.continue-hero::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: '';
+  background: linear-gradient(90deg, rgba(13,15,23,.94) 0%, rgba(18,20,31,.78) 52%, rgba(18,20,31,.28) 100%);
+}
+.continue-hero::after { background: linear-gradient(0deg, rgba(9,11,17,.5), transparent 55%); }
+.continue-copy { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 15px; max-width: min(66%, 720px); }
+.continue-copy .hero-kicker { color: #D0C9FF; }
+.continue-title {
+  max-width: 100%;
+  padding: 0;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  font: 750 clamp(30px, 4vw, 48px)/1.08 'Outfit', sans-serif;
+  letter-spacing: -1px;
+  text-align: left;
+  text-shadow: 0 3px 22px #0009;
+}
+.continue-title:hover { color: #E2DDFF; }
+.continue-poster {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: clamp(145px, 16vw, 190px);
+  aspect-ratio: 2 / 2.82;
+  max-height: 270px;
+  padding: 0;
+  overflow: hidden;
+  color: #B9AEFF;
+  background: rgba(13,15,23,.42);
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 10px;
+  box-shadow: 0 18px 46px #0008;
+  backdrop-filter: blur(8px);
+}
+.continue-poster img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.continue-controls {
+  position: absolute;
+  z-index: 2;
+  right: 20px;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 7px;
+  color: #E3E0F4;
+  background: rgba(10,12,19,.58);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 99px;
+  backdrop-filter: blur(10px);
+}
+.continue-controls span { min-width: 28px; color: #D0CDDF; font-size: 9px; text-align: center; font-variant-numeric: tabular-nums; }
+.continue-controls button { display: grid; place-items: center; width: 25px; height: 25px; padding: 0; color: #F4F1FF; background: #FFFFFF12; border: 0; border-radius: 50%; }
+.continue-controls button:hover { background: #8B7CFF55; }
+.home-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin: 19px 0 39px;
+  padding: 0;
+  border: 0;
+}
+.home-summary div { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.home-summary strong { color: #F2F1F8; font: 700 26px/1 'Outfit', sans-serif; }
+.home-summary span { color: var(--muted-2); font-size: 9px; letter-spacing: .2px; }
+
+/* A área Descobrir usa os mesmos pôsteres e metadados da Home/Biblioteca */
+.discover-page .page-intro { margin-bottom: 22px; }
+.discover-tabs { width: 100%; gap: 7px; margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; }
+.discover-tabs::-webkit-scrollbar { display: none; }
+.discover-tab { flex: 0 0 auto; padding: 10px 15px; font-size: 10px; }
+.discover-feature {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  min-height: 325px;
+  margin: 0 0 38px;
+  padding: 30px clamp(22px, 4vw, 48px);
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(115deg, #1A3445, #24213D);
+  border: 1px solid #46405F;
+  border-radius: 16px;
+}
+.discover-feature-backdrop {
+  position: absolute;
+  z-index: -2;
+  inset: -24px;
+  background-position: center 35%;
+  background-size: cover;
+  filter: blur(23px);
+  opacity: .46;
+  transform: scale(1.08);
+}
+.discover-feature::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: '';
+  background: linear-gradient(90deg, rgba(13,15,23,.94) 0%, rgba(18,20,31,.79) 53%, rgba(18,20,31,.32) 100%);
+}
+.discover-feature::after { background: linear-gradient(0deg, rgba(9,11,17,.48), transparent 55%); }
+.feature-copy { z-index: 1; width: min(68%, 720px); padding: 18px 0; }
+.feature-copy h2 { font-size: clamp(27px, 3.2vw, 42px); }
+.feature-copy > p { max-width: 560px; font-size: 11px; -webkit-line-clamp: 3; }
+.discover-feature-poster {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: clamp(145px, 16vw, 188px);
+  aspect-ratio: 2 / 2.82;
+  max-height: 270px;
+  padding: 0;
+  overflow: hidden;
+  color: #B9AEFF;
+  background: rgba(13,15,23,.46);
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 10px;
+  box-shadow: 0 18px 46px #0008;
+  backdrop-filter: blur(8px);
+}
+.discover-feature-poster img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.discover-shelf { margin-bottom: 40px; }
+.discover-poster-rail { align-items: start; }
+.discover-poster-item { display: flex; flex-direction: column; min-width: 0; }
+.discover-poster-card { width: 100%; }
+.discover-poster-card .poster-art img { object-fit: cover; }
+.discover-poster-item .discover-add { width: 100%; min-height: 32px; margin-top: 9px; padding: 6px 8px; font-size: 8px; }
+.discover-reason { min-height: 28px; margin-top: 5px; color: var(--muted-2); font-size: 8px; line-height: 1.45; }
+.discover-page .catalog-count { font-size: 9px; white-space: nowrap; }
+.discover-page .genre-grid { margin-bottom: 34px; }
+.discover-page .genre-card { min-height: 58px; }
+
+/* Responsividade dos novos destaques */
+@media (max-width: 780px) {
+  .continue-hero { min-height: 285px; }
+  .continue-copy { max-width: 62%; }
+  .continue-poster, .discover-feature-poster { width: 142px; }
+  .discover-feature { min-height: 290px; gap: 18px; }
+  .feature-copy { width: 65%; }
+}
+@media (max-width: 600px) {
+  .continue-hero { min-height: 245px; padding: 20px 16px 48px; margin-bottom: 0; border-radius: 12px; }
+  .continue-copy { max-width: calc(100% - 112px); gap: 10px; }
+  .continue-copy .hero-kicker { font-size: 7px; letter-spacing: .8px; }
+  .continue-copy .hero-kicker svg { width: 11px; height: 11px; }
+  .continue-title { font-size: 23px; line-height: 1.12; overflow-wrap: anywhere; }
+  .continue-poster { width: 102px; max-height: 145px; border-radius: 7px; }
+  .continue-controls { right: 12px; bottom: 9px; gap: 6px; padding: 3px 5px; }
+  .continue-controls button { width: 23px; height: 23px; }
+  .home-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px 24px; margin: 17px 0 30px; }
+  .home-summary strong { font-size: 22px; }
+  .home-summary span { font-size: 8px; }
+  .discover-page .page-intro { margin-bottom: 17px; }
+  .discover-tabs { width: 100%; gap: 4px; margin-bottom: 17px; padding: 4px; }
+  .discover-tab { padding: 8px 10px; font-size: 8px; }
+  .discover-feature { min-height: 245px; gap: 12px; margin-bottom: 29px; padding: 17px 14px; border-radius: 12px; }
+  .feature-copy { width: calc(100% - 94px); padding: 6px 0; }
+  .feature-tag { font-size: 7px; letter-spacing: .7px; }
+  .feature-copy h2 { margin: 9px 0 6px; font-size: 22px; overflow-wrap: anywhere; }
+  .feature-copy > p { max-width: none; font-size: 8px; -webkit-line-clamp: 3; }
+  .feature-meta { flex-wrap: wrap; gap: 5px; font-size: 8px; }
+  .feature-copy .hero-actions { gap: 9px; margin-top: 13px; }
+  .feature-copy .primary-button { min-height: 32px; padding: 0 9px; font-size: 8px; }
+  .feature-copy .hero-secondary { font-size: 8px; }
+  .discover-feature-poster { width: 88px; max-height: 130px; border-radius: 6px; }
+  .discover-shelf { margin-bottom: 30px; }
+  .discover-page .poster-rail { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 11px; }
+  .discover-poster-item .poster-name { font-size: 9px; }
+  .discover-poster-item .poster-meta { font-size: 7px; }
+  .discover-poster-item .discover-add { min-height: 28px; font-size: 7px; }
+  .discover-reason { font-size: 7px; }
+  .discover-page .section-heading h2 { font-size: 16px; }
+}

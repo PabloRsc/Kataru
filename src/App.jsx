@@ -61,6 +61,62 @@ const shortDate = value => {
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 };
 
+const getAnimeAliases = anime => [...new Set([
+  anime?.title,
+  anime?.title_english,
+  anime?.title_japanese,
+  anime?.display_title,
+  ...(Array.isArray(anime?.title_aliases) ? anime.title_aliases : []),
+  ...(Array.isArray(anime?.title_synonyms) ? anime.title_synonyms : [])
+].map(value => String(value || '').trim()).filter(Boolean))];
+
+const normalizeAnimeTitle = value => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/&/g, ' and ')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim()
+  .replace(/\s+/g, ' ');
+
+function sameAnimeEntry(left, right) {
+  if (!left || !right) return false;
+  if (left.mal_id != null && right.mal_id != null && String(left.mal_id) === String(right.mal_id)) return true;
+
+  const leftFormat = String(left.format || '').toLowerCase().trim();
+  const rightFormat = String(right.format || '').toLowerCase().trim();
+  if (leftFormat && rightFormat && leftFormat !== rightFormat) return false;
+
+  const leftYear = Number(left.year) || null;
+  const rightYear = Number(right.year) || null;
+  if (leftYear && rightYear && leftYear !== rightYear) return false;
+
+  const leftSeason = String(left.season || '').toLowerCase().trim();
+  const rightSeason = String(right.season || '').toLowerCase().trim();
+  if (leftSeason && rightSeason && leftSeason !== rightSeason) return false;
+
+  const leftAliases = new Set(getAnimeAliases(left).map(normalizeAnimeTitle).filter(Boolean));
+  const rightAliases = getAnimeAliases(right).map(normalizeAnimeTitle).filter(Boolean);
+  if (!rightAliases.some(alias => leftAliases.has(alias))) return false;
+
+  // With matching release metadata, a shared official/alternate title is sufficient.
+  if (leftYear && rightYear && leftYear === rightYear) return true;
+  if (leftYear && rightYear && leftYear === rightYear && leftSeason && rightSeason && leftSeason === rightSeason) return true;
+
+  // If one side has incomplete metadata, only accept an exact primary-title match.
+  const leftPrimary = normalizeAnimeTitle(left.title || left.display_title);
+  const rightPrimary = normalizeAnimeTitle(right.title || right.display_title);
+  return Boolean(leftPrimary && leftPrimary === rightPrimary);
+}
+
+function uniqueAnimeEntries(entries) {
+  const unique = [];
+  (entries || []).forEach(anime => {
+    if (!unique.some(existing => sameAnimeEntry(existing, anime))) unique.push(anime);
+  });
+  return unique;
+}
+
 const displayTitle = anime => anime?.display_title?.trim() || anime?.title || 'Sem título';
 const totalEpisodes = anime => Number(anime?.episodes_total_manual || anime?.episodes_total || 0) || null;
 const isCurrentlyAiring = anime => ['currently airing', 'currently_airing', 'releasing', 'airing', 'ongoing', 'em exibição']
@@ -236,7 +292,7 @@ export default function App() {
       ])
         .then(([data, recommendations]) => {
           if (!active) return;
-          setDiscoverResults(data.items || []);
+          setDiscoverResults(uniqueAnimeEntries(data.items || []));
           setDiscoverPage(data.page || 1);
           setDiscoverHasMore(Boolean(data.hasMore));
           setDiscoverRecommendations(recommendations.items || []);
@@ -260,8 +316,8 @@ export default function App() {
     try {
       const response = await discoverAnime(kind, nextPage);
       setDiscoverResults(current => {
-        const known = new Set(current.map(anime => String(anime.mal_id)));
-        const next = (response.items || []).filter(anime => !known.has(String(anime.mal_id)));
+        const next = uniqueAnimeEntries(response.items || [])
+          .filter(anime => !current.some(existing => sameAnimeEntry(existing, anime)));
         return [...current, ...next];
       });
       setDiscoverPage(response.page || nextPage);
@@ -688,7 +744,7 @@ export default function App() {
     }
   }
 
-  const isInCollection = anime => items.some(item => String(item.mal_id) === String(anime.mal_id));
+  const isInCollection = anime => items.some(item => sameAnimeEntry(item, anime));
   const watching = items.filter(item => item.status === 'watching').sort(sortByRecent);
   const completed = items.filter(item => item.status === 'completed').sort(sortByRecent);
   const planned = items.filter(item => item.status === 'planned').sort(sortByRecent);
@@ -1204,13 +1260,13 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
     genreAffinity[genre] = (genreAffinity[genre] || 0) + (anime.status === 'completed' || anime.status === 'watching' ? 2 : 1);
   }));
   // Discovery is for new titles only: remove anything already saved, regardless of status or rating.
-  const catalogResults = (results || []).filter(anime => !isInCollection(anime));
-  const catalogRecommendations = (recommendationSource || []).filter(anime => !isInCollection(anime));
+  const catalogResults = uniqueAnimeEntries(results || []).filter(anime => !isInCollection(anime));
+  const catalogRecommendations = uniqueAnimeEntries(recommendationSource || []).filter(anime => !isInCollection(anime));
   const preferredGenres = Object.entries(genreAffinity).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name]) => name);
   const feature = catalogResults[0] || null;
   const catalogIds = new Set(catalogResults.map(anime => String(anime.mal_id)));
   const recommendations = catalogRecommendations
-    .filter(anime => !catalogIds.has(String(anime.mal_id)))
+    .filter(anime => !catalogResults.some(result => sameAnimeEntry(result, anime)))
     .map(anime => ({
       ...anime,
       _matchedGenres: (anime.genres || []).filter(genre => preferredGenres.includes(genre)),

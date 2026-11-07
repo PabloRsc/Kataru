@@ -62,7 +62,7 @@ const shortDate = value => {
 
 const displayTitle = anime => anime?.display_title?.trim() || anime?.title || 'Sem título';
 const totalEpisodes = anime => Number(anime?.episodes_total_manual || anime?.episodes_total || 0) || null;
-const isCurrentlyAiring = anime => /currently airing|em exibição/i.test(String(anime?.airing_status || ''));
+const isCurrentlyAiring = anime => /currently airing|currently_airing|releasing|airing|em exibição/i.test(String(anime?.airing_status || ''));
 const latestAiredEpisode = anime => Number(anime?.episodes_available || 0) || null;
 const episodeProgressLimit = anime => isCurrentlyAiring(anime)
   ? latestAiredEpisode(anime)
@@ -744,6 +744,9 @@ export default function App() {
           onManual={startManualAdd}
           isInCollection={isInCollection}
           allowExisting={Boolean(pendingListId)}
+          libraryItems={items}
+          alreadyInListIds={lists.find(list => String(list.id) === String(pendingListId))?.anime_ids || []}
+          targetListName={lists.find(list => String(list.id) === String(pendingListId))?.name || ''}
         />
       )}
 
@@ -1183,13 +1186,21 @@ function StarRating({ value, onChange }) {
   return <div className="star-rating" role="group" aria-label="Sua nota de zero a cinco estrelas">{[1, 2, 3, 4, 5].map(star => <button type="button" key={star} className={star <= value ? 'filled' : ''} onClick={() => onChange(star === value ? 0 : star)} aria-label={star + ' estrelas'}><Star size={23} fill={star <= value ? 'currentColor' : 'none'} /></button>)}</div>;
 }
 
-function SearchModal({ query, setQuery, results, searching, error, onSearch, onClose, onAdd, onManual, isInCollection, allowExisting }) {
+function SearchModal({ query, setQuery, results, searching, error, onSearch, onClose, onAdd, onManual, isInCollection, allowExisting, libraryItems = [], alreadyInListIds = [], targetListName = '' }) {
   const [formatFilter, setFormatFilter] = useState('all');
   const formatOptions = [
     { id: 'all', label: 'Todos' }, { id: 'TV', label: 'Série (TV)' },
     { id: 'Movie', label: 'Filme' }, { id: 'OVA', label: 'OVA' }
   ];
   const normalizedQuery = query.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const alreadyInList = new Set(alreadyInListIds.map(String));
+  const filteredLibrary = allowExisting
+    ? libraryItems
+      .filter(anime => !alreadyInList.has(String(anime.mal_id)))
+      .filter(anime => !normalizedQuery || displayTitle(anime).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(normalizedQuery))
+      .sort((a, b) => sortByRecent(a, b))
+    : [];
+  const visibleLibrary = filteredLibrary.slice(0, 24);
   const filteredResults = results
     .filter(result => formatFilter === 'all' || result.format === formatFilter)
     .sort((a, b) => {
@@ -1201,26 +1212,39 @@ function SearchModal({ query, setQuery, results, searching, error, onSearch, onC
   return (
     <div className="overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="modal search-modal">
-        <div className="modal-header"><div><p className="eyebrow">ENCONTRE SEU PRÓXIMO ANIME</p><h2>Buscar no catálogo</h2></div><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={18} /></button></div>
+        <div className="modal-header"><div><p className="eyebrow">{allowExisting ? 'SUA COLEÇÃO E CATÁLOGO' : 'ENCONTRE SEU PRÓXIMO ANIME'}</p><h2>{allowExisting ? 'Adicionar à lista' : 'Buscar no catálogo'}</h2>{allowExisting && targetListName && <small className="target-list-name">{targetListName}</small>}</div><button className="icon-button" onClick={onClose} aria-label="Fechar"><X size={18} /></button></div>
         <form className="catalog-search" onSubmit={onSearch}>
           <Search size={19} />
-          <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Digite pelo menos 2 letras do anime..." />
+          <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={allowExisting ? 'Filtrar sua biblioteca ou buscar no catálogo...' : 'Digite pelo menos 2 letras do anime...'} />
           {searching && <LoaderCircle className="spin" size={17} />}
         </form>
-        <p className="helper-text">Os resultados aparecem automaticamente enquanto você digita.</p>
+        <p className="helper-text">{allowExisting ? 'Escolha um anime que já está na sua biblioteca ou pesquise no catálogo para adicionar um novo.' : 'Os resultados aparecem automaticamente enquanto você digita.'}</p>
+        {allowExisting && (
+          <section className="library-picker-section">
+            <div className="library-picker-heading"><div><strong>Da sua biblioteca</strong><span>{filteredLibrary.length} {filteredLibrary.length === 1 ? 'anime disponível' : 'animes disponíveis'}</span></div><span>SEM NOVO CADASTRO</span></div>
+            {visibleLibrary.length ? <div className="results-list library-picker-list">{visibleLibrary.map(anime => (
+              <article className="result-row" key={'library-' + anime.mal_id}>
+                {anime.image_url ? <img src={anime.image_url} alt="" /> : <div className="result-cover-fallback"><Clapperboard size={18} /></div>}
+                <div className="result-info"><strong>{displayTitle(anime)}</strong><small>{statusLabel(anime.status)} · {Number(anime.episode_current || 0)} episódios assistidos</small></div>
+                <button type="button" className="outline-button" onClick={() => onAdd(anime)}><Plus size={14} />Adicionar à lista</button>
+              </article>
+            ))}</div> : <div className="library-picker-empty">{normalizedQuery ? 'Nenhum título da sua biblioteca corresponde à pesquisa.' : 'Todos os animes da sua biblioteca já estão nesta lista.'}</div>}
+            {filteredLibrary.length > visibleLibrary.length && <p className="library-picker-more">Mostrando os 24 mais recentes. Digite para filtrar os demais.</p>}
+          </section>
+        )}
         {error && <div className="error-panel"><span>{error}</span><button type="button" className="outline-button" onClick={onManual}>Adicionar manualmente</button></div>}
         {results.length > 0 && <div className="search-format-tabs" role="group" aria-label="Filtrar formato">{formatOptions.map(option => <button type="button" key={option.id} className={formatFilter === option.id ? 'active' : ''} onClick={() => setFormatFilter(option.id)}>{option.label}</button>)}</div>}
-        {searching && !results.length && <div className="loading-block compact-loading"><LoaderCircle className="spin" />Buscando “{query.trim()}”...</div>}
+        {searching && !results.length && <div className="loading-block compact-loading"><LoaderCircle className="spin" />Buscando “{query.trim()}” no catálogo...</div>}
         {filteredResults.length > 0 && <div className="results-list">{filteredResults.map(result => {
           const exists = isInCollection(result);
           const canAddToList = exists && allowExisting;
-          return <article className="result-row" key={result.mal_id}>
+          return <article className="result-row" key={'catalog-' + result.mal_id}>
             {result.image_url ? <img src={result.image_url} alt="" /> : <div className="result-cover-fallback"><Clapperboard size={18} /></div>}
             <div className="result-info"><strong>{displayTitle(result)}</strong>{result.title_english && result.title_english !== result.title && <span>{result.title_english}</span>}<small>{result.year || 'Ano não informado'} · {result.episodes_total ?? '?'} episódios · {result.format || 'Anime'}</small></div>
-            <button className={exists && !canAddToList ? 'outline-button result-added' : 'outline-button'} disabled={exists && !canAddToList} onClick={() => onAdd(result)}>{canAddToList ? <><Plus size={14} />Adicionar à lista</> : exists ? <><Check size={14} />Na biblioteca</> : <><Plus size={14} />Adicionar</>}</button>
+            <button type="button" className={exists && !canAddToList ? 'outline-button result-added' : 'outline-button'} disabled={exists && !canAddToList} onClick={() => onAdd(result)}>{canAddToList ? <><Plus size={14} />Adicionar à lista</> : exists ? <><Check size={14} />Na biblioteca</> : <><Plus size={14} />Adicionar</>}</button>
           </article>;
         })}</div>}
-        {!searching && !error && !results.length && <div className="search-empty"><Search size={25} /><p>{query.trim().length >= 2 ? 'Nenhum anime encontrado para esta pesquisa.' : 'Comece digitando o nome de um anime.'}</p><button className="text-link" type="button" onClick={onManual}>{query.trim().length >= 2 ? 'Não encontrou no catálogo? Adicionar manualmente' : 'Adicionar manualmente'} <ArrowRight size={13} /></button></div>}
+        {!searching && !error && !results.length && !visibleLibrary.length && <div className="search-empty"><Search size={25} /><p>{query.trim().length >= 2 ? 'Nenhum anime encontrado para esta pesquisa.' : allowExisting ? 'Pesquise no catálogo para encontrar novos títulos.' : 'Comece digitando o nome de um anime.'}</p><button className="text-link" type="button" onClick={onManual}>{query.trim().length >= 2 ? 'Não encontrou no catálogo? Adicionar manualmente' : 'Adicionar manualmente'} <ArrowRight size={13} /></button></div>}
         {!searching && results.length > 0 && !filteredResults.length && <div className="search-filter-empty"><p>Nenhum título neste formato. Escolha outra categoria.</p></div>}
         {results.length > 0 && <button className="manual-add-link" type="button" onClick={onManual}><Plus size={14} />Adicionar manualmente</button>}
       </section>

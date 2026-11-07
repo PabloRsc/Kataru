@@ -1,20 +1,8 @@
 const BASE = '/api/anime';
-const JIKAN_BASE = 'https://api.jikan.moe/v4';
 
 const catalogEntries = payload => Array.isArray(payload?.data)
   ? payload.data
   : Array.isArray(payload) ? payload : [];
-
-const normalizeGenre = value => String(value || '')
-  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-
-const JIKAN_GENRE_IDS = {
-  action: 1, adventure: 2, comedy: 4, 'avant garde': 5, mystery: 7,
-  drama: 8, ecchi: 9, fantasy: 10, horror: 14, romance: 22,
-  'sci-fi': 24, "girls' love": 26, "boys' love": 28, sports: 30,
-  'slice of life': 36, supernatural: 37, suspense: 41,
-  'award winning': 46, gourmet: 47
-};
 
 async function request(path) {
   const controller = new AbortController();
@@ -38,53 +26,11 @@ async function request(path) {
   }
 }
 
-// Secondary browser-side path: Descobrir can still load when the Vercel
-// serverless route is unavailable. The server route remains the primary path
-// so its AniList fallback and normalization continue to be used whenever possible.
-async function requestJikanCatalog(path) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-  try {
-    const response = await fetch(JIKAN_BASE + path, {
-      signal: controller.signal,
-      headers: { Accept: 'application/json' }
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message = response.status === 429
-        ? 'A Jikan está limitando as consultas. Aguarde alguns segundos e tente novamente.'
-        : payload.message || `A Jikan respondeu com HTTP ${response.status}.`;
-      throw new Error(message);
-    }
-    return payload;
-  } catch (error) {
-    if (error.name === 'AbortError') throw new Error('A consulta direta à Jikan demorou demais.');
-    if (error instanceof TypeError) throw new Error('Não foi possível acessar a Jikan diretamente (conexão ou CORS).');
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function requestCatalogWithFallback(apiPath, jikanPath) {
-  let serverError;
-  try {
-    const payload = await request(apiPath);
-    if (catalogEntries(payload).length) return payload;
-    serverError = new Error('A rota interna retornou uma lista vazia.');
-  } catch (error) {
-    serverError = error;
-  }
-
-  if (!jikanPath) throw serverError;
-
-  try {
-    const payload = await requestJikanCatalog(jikanPath);
-    if (catalogEntries(payload).length) return payload;
-    throw new Error('A Jikan não retornou títulos para esta categoria.');
-  } catch (jikanError) {
-    throw new Error(`Serviço interno: ${serverError.message} Tentativa direta: ${jikanError.message}`);
-  }
+async function requestCatalog(apiPath) {
+  const payload = await request(apiPath);
+  const entries = catalogEntries(payload);
+  if (!entries.length) throw new Error('O catálogo respondeu, mas não retornou títulos para esta categoria.');
+  return entries;
 }
 
 export async function searchAnime(query) {
@@ -98,48 +44,27 @@ export async function fetchAnime(malId) {
 }
 
 export async function discoverAnime(kind = 'popular') {
-  let apiPath;
-  let jikanPath;
-
-  if (kind === 'popular') {
-    apiPath = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
-    jikanPath = '/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
-  } else if (kind === 'top-rated') {
-    apiPath = '/api/catalog/top/anime?type=tv&limit=24&sfw=true&ranking=score';
-    // Jikan's top/anime endpoint is already ordered by score by default.
-    jikanPath = '/top/anime?type=tv&limit=24&sfw=true';
-  } else if (String(kind).startsWith('genre-')) {
+  let path;
+  if (kind === 'popular') path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
+  else if (kind === 'top-rated') path = '/api/catalog/top/anime?type=tv&limit=24&sfw=true&ranking=score';
+  else if (String(kind).startsWith('genre-')) {
     const genre = decodeURIComponent(String(kind).slice(6)).trim();
     if (!genre) throw new Error('Escolha um gênero para continuar.');
-    const genreId = /^\d+$/.test(genre) ? Number(genre) : JIKAN_GENRE_IDS[normalizeGenre(genre)];
-    const query = genreId
-      ? 'genres=' + encodeURIComponent(genreId)
-      : 'genre=' + encodeURIComponent(genre);
-    apiPath = '/api/catalog/anime?' + query + '&order_by=popularity&sort=asc&limit=24&sfw=true';
-    jikanPath = genreId
-      ? '/anime?genres=' + encodeURIComponent(genreId) + '&order_by=popularity&sort=asc&limit=24&sfw=true'
-      : null;
-  } else {
-    apiPath = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
-    jikanPath = '/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
-  }
+    path = '/api/catalog/anime?genre=' + encodeURIComponent(genre) + '&order_by=popularity&sort=asc&limit=24&sfw=true';
+  } else path = '/api/catalog/top/anime?type=tv&filter=bypopularity&limit=24&sfw=true';
 
-  const data = await requestCatalogWithFallback(apiPath, jikanPath);
-  return catalogEntries(data).map(normalizeAnime);
+  return (await requestCatalog(path)).map(normalizeAnime);
 }
 
 export async function fetchAnimeGenres() {
-  const data = await requestCatalogWithFallback(
-    '/api/catalog/genres/anime?filter=genres',
-    '/genres/anime?filter=genres'
-  );
-  return catalogEntries(data).map(genre => ({
+  const entries = await requestCatalog('/api/catalog/genres/anime?filter=genres');
+  return entries.map(genre => ({
     mal_id: Number.isSafeInteger(Number(genre.mal_id)) ? Number(genre.mal_id) : null,
     name: genre.name
   })).filter(genre => genre.name);
 }
-// The catalogue is fetched on demand; it only enters the collection after an explicit add action.
 
+// The catalogue is fetched on demand; it only enters the collection after an explicit add action.
 export function normalizeAnime(a = {}) {
   return {
     mal_id: a.mal_id,

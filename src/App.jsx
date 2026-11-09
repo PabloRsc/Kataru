@@ -1914,7 +1914,6 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
       setSelectedList(null);
       setConnectionsType(null);
       setConnections([]);
-      setQuery('');
       setError('');
       setNotice('');
       searchInputRef.current?.focus();

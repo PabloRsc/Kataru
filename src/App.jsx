@@ -290,7 +290,7 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [activeList, setActiveList] = useState(null);
   const [filter, setFilter] = useState('all');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery || '');
   const [sort, setSort] = useState('franchise');
   const [genreFilter, setGenreFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -337,6 +337,9 @@ export default function App() {
   const [communityOpen, setCommunityOpen] = useState(false);
   const [communityProfileRequest, setCommunityProfileRequest] = useState(0);
   const [communitySearchRequest, setCommunitySearchRequest] = useState(0);
+  const [communityTargetProfile, setCommunityTargetProfile] = useState(null);
+  const [communitySearchInitialQuery, setCommunitySearchInitialQuery] = useState('');
+  const [communityReturnPage, setCommunityReturnPage] = useState('home');
   const profileRef = useRef(null);
 
   useEffect(() => {
@@ -1012,6 +1015,8 @@ export default function App() {
                   </nav>
         <div className="topbar-actions">
           <button className="global-search" aria-label="Buscar usuários" onClick={() => {
+            setCommunityReturnPage(page);
+            setCommunitySearchInitialQuery('');
             setCommunityOpen(true);
             setCommunitySearchRequest(value => value + 1);
           }}><Search size={16} /><span>Buscar usuários...</span></button>
@@ -1036,7 +1041,13 @@ export default function App() {
                 <strong>{authUser?.user_metadata?.username || authUser?.user_metadata?.username || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
                 <span>{authUser?.email || 'Seus dados ficam salvos neste navegador.'}</span>
               </div>
-              {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={() => { setProfileOpen(false); setCommunityOpen(true); setCommunityProfileRequest(value => value + 1); }}><UserRound size={15} />Meu perfil</button>}
+              {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={() => {
+                setProfileOpen(false);
+                setCommunityReturnPage(page);
+                setCommunityTargetProfile(null);
+                navigate('community');
+                setCommunityProfileRequest(value => value + 1);
+              }}><UserRound size={15} />Meu perfil</button>}
               {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={async () => {
                 setProfileOpen(false);
                 const { error } = await supabase.auth.signOut();
@@ -1144,6 +1155,23 @@ export default function App() {
             findInCollection={anime => items.find(item => String(item.mal_id) === String(anime.mal_id)) || null}
             isInCollection={isInCollection}
           />
+        ) : page === 'community' ? (
+          <CommunityPage
+            open
+            pageMode
+            currentUserId={authUser?.id}
+            initialProfile={communityTargetProfile}
+            openMyProfileSignal={communityProfileRequest}
+            acknowledgeMyProfileRequest={setCommunityProfileRequest}
+            onBackToSearch={query => {
+              setCommunityTargetProfile(null);
+              setPage(communityReturnPage || 'home');
+              setCommunitySearchInitialQuery(query || '');
+              setCommunityOpen(true);
+              setCommunitySearchRequest(value => value + 1);
+            }}
+            onOpenProfile={profile => setCommunityTargetProfile(profile)}
+          />
         ) : (
           <ListsPage
             items={items}
@@ -1178,10 +1206,15 @@ export default function App() {
       {communityOpen && (
         <CommunityPage
           open
-          onClose={() => setCommunityOpen(false)}
           currentUserId={authUser?.id}
-          openMyProfileSignal={communityProfileRequest}
-          acknowledgeMyProfileRequest={setCommunityProfileRequest}
+          initialQuery={communitySearchInitialQuery}
+          onClose={() => setCommunityOpen(false)}
+          onOpenProfile={(profile, query) => {
+            setCommunityTargetProfile(profile);
+            setCommunitySearchInitialQuery(query || '');
+            setCommunityOpen(false);
+            navigate('community');
+          }}
           focusSearchSignal={communitySearchRequest}
           acknowledgeSearchRequest={setCommunitySearchRequest}
         />
@@ -1843,7 +1876,7 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
   );
 }
 
-function CommunityPage({ open, onClose, currentUserId, openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
+function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -1967,6 +2000,10 @@ function CommunityPage({ open, onClose, currentUserId, openMyProfileSignal = 0, 
     }
   }
 
+  useEffect(() => {
+    if (pageMode && initialProfile) openProfile(initialProfile);
+  }, [pageMode, initialProfile?.user_id]);
+
   async function openMyProfile() {
     setLoading(true);
     setError('');
@@ -2048,12 +2085,14 @@ function CommunityPage({ open, onClose, currentUserId, openMyProfileSignal = 0, 
   }
 
   function returnToUserSearch() {
+    const previousQuery = query;
     setSelectedProfile(null);
     setSelectedList(null);
     setConnectionsType(null);
     setConnections([]);
     setNotice('');
     setError('');
+    if (pageMode) onBackToSearch?.(previousQuery);
   }
 
   function renderAnimeGrid(entries) {
@@ -2079,6 +2118,7 @@ function CommunityPage({ open, onClose, currentUserId, openMyProfileSignal = 0, 
   }
 
   if (!open) return null;
+  if (pageMode && !selectedProfile) return <div className="community-page"><div className="loading-block"><LoaderCircle className="spin" />Carregando perfil...</div></div>;
 
   const modalTitle = selectedProfile
     ? (selectedProfile.display_name || selectedProfile.username)
@@ -2090,6 +2130,91 @@ function CommunityPage({ open, onClose, currentUserId, openMyProfileSignal = 0, 
     const listEntries = selectedList
       ? (selectedList.anime_ids || []).map(id => profileAnime.find(anime => String(anime.mal_id) === String(id))).filter(Boolean)
       : [];
+    const profileContent = (
+      <>
+                <button className="back-link" onClick={selectedList ? () => setSelectedList(null) : connectionsType ? () => setConnectionsType(null) : returnToUserSearch}>
+                  <ChevronLeft size={16} />{selectedList ? 'Voltar às listas' : connectionsType ? 'Voltar ao perfil' : 'Voltar à busca de usuários'}
+                </button>
+                {selectedList ? (
+                  <section className="social-list-detail">
+                    <div className="social-list-detail-head">
+                      <span className="social-list-icon"><List size={23} /></span>
+                      <div><p className="eyebrow">LISTA DE @{selectedProfile.username}</p><h1>{selectedList.name}</h1><p>{selectedList.description || 'Uma seleção de animes.'}</p><small>{listEntries.length} {listEntries.length === 1 ? 'anime' : 'animes'}{selectedList.is_ranked ? ' · ranqueada' : ''}</small></div>
+                    </div>
+                    {renderAnimeGrid(listEntries)}
+                  </section>
+                ) : connectionsType ? (
+                  <section className="social-connections-panel">
+                    <div className="page-intro"><div><p className="eyebrow">COMUNIDADE KATARU</p><h1>{connectionsType === 'followers' ? 'Seguidores' : 'Seguindo'}</h1><p className="page-subtitle">Pessoas relacionadas a @{selectedProfile.username}.</p></div></div>
+                    {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando pessoas...</div> : connections.length ? (
+                      <div className="social-user-grid">
+                        {connections.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} />)}
+                      </div>
+                    ) : <div className="social-empty"><Users size={23} /><strong>Ninguém por aqui ainda</strong></div>}
+                  </section>
+                ) : (
+                  <>
+                    <section className="social-profile-hero">
+                      <div className="social-profile-main">
+                        <SocialAvatar profile={selectedProfile} size="large" />
+                        <div className="social-profile-copy">
+                          <p className="eyebrow">{ownProfile ? 'MEU PERFIL' : 'PERFIL KATARU'}</p>
+                          <h1>{selectedProfile.display_name || selectedProfile.username}</h1>
+                          <span>@{selectedProfile.username}</span>
+                          {selectedProfile.bio && <p>{selectedProfile.bio}</p>}
+                          <small>Na comunidade desde {formatDate(selectedProfile.created_at)}</small>
+                        </div>
+                      </div>
+                      <div className="social-profile-actions">
+                        {ownProfile
+                          ? <button className="outline-button" onClick={() => setEditingProfile(value => !value)}><Pencil size={14} />{editingProfile ? 'Cancelar edição' : 'Editar perfil'}</button>
+                          : <button className={isFollowing ? 'outline-button social-following-button' : 'primary-button'} onClick={toggleFollow} disabled={busy}>
+                              {busy ? <LoaderCircle size={15} className="spin" /> : isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
+                              {busy ? 'Aguarde...' : isFollowing ? 'Seguindo' : 'Seguir'}
+                            </button>}
+                      </div>
+                      <div className="social-profile-stats">
+                        <button onClick={() => showConnections('followers')}><strong>{profileStats.followers}</strong><span>Seguidores</span></button>
+                        <button onClick={() => showConnections('following')}><strong>{profileStats.following}</strong><span>Seguindo</span></button>
+                        <div><strong>{ownProfile || isFollowing ? profileAnime.length : '—'}</strong><span>Animes</span></div>
+                      </div>
+                    </section>
+                    {editingProfile && ownProfile && (
+                      <form className="social-profile-edit" onSubmit={saveProfile}>
+                        <label>Nome de exibição<input maxLength={50} value={profileForm.display_name} onChange={event => setProfileForm(value => ({ ...value, display_name: event.target.value }))} placeholder="Como as pessoas verão você" /></label>
+                        <label>Bio<textarea maxLength={160} rows={3} value={profileForm.bio} onChange={event => setProfileForm(value => ({ ...value, bio: event.target.value }))} placeholder="Conte um pouco sobre seus gostos de anime" /></label>
+                        <div><small>{profileForm.bio.length}/160 caracteres</small><button className="primary-button" type="submit" disabled={savingProfile}>{savingProfile ? 'Salvando...' : 'Salvar perfil'}</button></div>
+                      </form>
+                    )}
+                    {notice && <div className="social-notice">{notice}</div>}
+                    {error && <div className="social-error">{error}</div>}
+                    <div className="social-profile-tabs">
+                      <button className={profileTab === 'library' ? 'active' : ''} onClick={() => { setProfileTab('library'); setSelectedList(null); }}><Library size={15} />Biblioteca</button>
+                      <button className={profileTab === 'lists' ? 'active' : ''} onClick={() => { setProfileTab('lists'); setSelectedList(null); }}><List size={15} />Listas <span>{visible ? profileLists.length : '🔒'}</span></button>
+                    </div>
+                    {contentLoading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando biblioteca e listas...</div> : visible ? (
+                      profileTab === 'library' ? renderAnimeGrid(profileAnime) : profileLists.length ? (
+                        <div className="social-lists-grid">
+                          {profileLists.map(list => (
+                            <button className="social-list-card" key={list.id} onClick={() => setSelectedList(list)}>
+                              <span className="social-list-icon"><List size={22} /></span>
+                              <span><strong>{list.name}</strong><small>{list.description || 'Lista de animes'}</small><em>{list.anime_ids?.length || 0} títulos{list.is_ranked ? ' · ranqueada' : ''}</em></span>
+                              <ChevronRight size={17} />
+                            </button>
+                          ))}
+                        </div>
+                      ) : <div className="social-empty"><List size={23} /><strong>Nenhuma lista criada</strong><span>Este perfil ainda não criou listas.</span></div>
+                    ) : (
+                      <div className="social-private-state"><Users size={25} /><strong>Biblioteca e listas para seguidores</strong><p>Siga @{selectedProfile.username} para acompanhar seus animes e listas.</p><button className="primary-button" onClick={toggleFollow} disabled={busy}><UserPlus size={15} />Seguir para ver o perfil</button></div>
+                    )}
+                  </>
+                )}
+      </>
+    );
+
+    if (pageMode) {
+      return <div className="community-page community-profile-page">{profileContent}</div>;
+    }
 
     return (
       <div className="overlay social-community-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
@@ -2098,90 +2223,11 @@ function CommunityPage({ open, onClose, currentUserId, openMyProfileSignal = 0, 
             <div><p className="eyebrow">COMUNIDADE KATARU</p><h2>{modalTitle}</h2></div>
             <button className="icon-button" onClick={onClose} aria-label="Fechar busca"><X size={17} /></button>
           </div>
-          <div className="community-page">
-        <button className="back-link" onClick={selectedList ? () => setSelectedList(null) : connectionsType ? () => setConnectionsType(null) : returnToUserSearch}>
-          <ChevronLeft size={16} />{selectedList ? 'Voltar às listas' : connectionsType ? 'Voltar ao perfil' : 'Voltar à busca de usuários'}
-        </button>
-        {selectedList ? (
-          <section className="social-list-detail">
-            <div className="social-list-detail-head">
-              <span className="social-list-icon"><List size={23} /></span>
-              <div><p className="eyebrow">LISTA DE @{selectedProfile.username}</p><h1>{selectedList.name}</h1><p>{selectedList.description || 'Uma seleção de animes.'}</p><small>{listEntries.length} {listEntries.length === 1 ? 'anime' : 'animes'}{selectedList.is_ranked ? ' · ranqueada' : ''}</small></div>
-            </div>
-            {renderAnimeGrid(listEntries)}
-          </section>
-        ) : connectionsType ? (
-          <section className="social-connections-panel">
-            <div className="page-intro"><div><p className="eyebrow">COMUNIDADE KATARU</p><h1>{connectionsType === 'followers' ? 'Seguidores' : 'Seguindo'}</h1><p className="page-subtitle">Pessoas relacionadas a @{selectedProfile.username}.</p></div></div>
-            {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando pessoas...</div> : connections.length ? (
-              <div className="social-user-grid">
-                {connections.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} />)}
-              </div>
-            ) : <div className="social-empty"><Users size={23} /><strong>Ninguém por aqui ainda</strong></div>}
-          </section>
-        ) : (
-          <>
-            <section className="social-profile-hero">
-              <div className="social-profile-main">
-                <SocialAvatar profile={selectedProfile} size="large" />
-                <div className="social-profile-copy">
-                  <p className="eyebrow">{ownProfile ? 'MEU PERFIL' : 'PERFIL KATARU'}</p>
-                  <h1>{selectedProfile.display_name || selectedProfile.username}</h1>
-                  <span>@{selectedProfile.username}</span>
-                  {selectedProfile.bio && <p>{selectedProfile.bio}</p>}
-                  <small>Na comunidade desde {formatDate(selectedProfile.created_at)}</small>
-                </div>
-              </div>
-              <div className="social-profile-actions">
-                {ownProfile
-                  ? <button className="outline-button" onClick={() => setEditingProfile(value => !value)}><Pencil size={14} />{editingProfile ? 'Cancelar edição' : 'Editar perfil'}</button>
-                  : <button className={isFollowing ? 'outline-button social-following-button' : 'primary-button'} onClick={toggleFollow} disabled={busy}>
-                      {busy ? <LoaderCircle size={15} className="spin" /> : isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
-                      {busy ? 'Aguarde...' : isFollowing ? 'Seguindo' : 'Seguir'}
-                    </button>}
-              </div>
-              <div className="social-profile-stats">
-                <button onClick={() => showConnections('followers')}><strong>{profileStats.followers}</strong><span>Seguidores</span></button>
-                <button onClick={() => showConnections('following')}><strong>{profileStats.following}</strong><span>Seguindo</span></button>
-                <div><strong>{ownProfile || isFollowing ? profileAnime.length : '—'}</strong><span>Animes</span></div>
-              </div>
-            </section>
-            {editingProfile && ownProfile && (
-              <form className="social-profile-edit" onSubmit={saveProfile}>
-                <label>Nome de exibição<input maxLength={50} value={profileForm.display_name} onChange={event => setProfileForm(value => ({ ...value, display_name: event.target.value }))} placeholder="Como as pessoas verão você" /></label>
-                <label>Bio<textarea maxLength={160} rows={3} value={profileForm.bio} onChange={event => setProfileForm(value => ({ ...value, bio: event.target.value }))} placeholder="Conte um pouco sobre seus gostos de anime" /></label>
-                <div><small>{profileForm.bio.length}/160 caracteres</small><button className="primary-button" type="submit" disabled={savingProfile}>{savingProfile ? 'Salvando...' : 'Salvar perfil'}</button></div>
-              </form>
-            )}
-            {notice && <div className="social-notice">{notice}</div>}
-            {error && <div className="social-error">{error}</div>}
-            <div className="social-profile-tabs">
-              <button className={profileTab === 'library' ? 'active' : ''} onClick={() => { setProfileTab('library'); setSelectedList(null); }}><Library size={15} />Biblioteca</button>
-              <button className={profileTab === 'lists' ? 'active' : ''} onClick={() => { setProfileTab('lists'); setSelectedList(null); }}><List size={15} />Listas <span>{visible ? profileLists.length : '🔒'}</span></button>
-            </div>
-            {contentLoading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando biblioteca e listas...</div> : visible ? (
-              profileTab === 'library' ? renderAnimeGrid(profileAnime) : profileLists.length ? (
-                <div className="social-lists-grid">
-                  {profileLists.map(list => (
-                    <button className="social-list-card" key={list.id} onClick={() => setSelectedList(list)}>
-                      <span className="social-list-icon"><List size={22} /></span>
-                      <span><strong>{list.name}</strong><small>{list.description || 'Lista de animes'}</small><em>{list.anime_ids?.length || 0} títulos{list.is_ranked ? ' · ranqueada' : ''}</em></span>
-                      <ChevronRight size={17} />
-                    </button>
-                  ))}
-                </div>
-              ) : <div className="social-empty"><List size={23} /><strong>Nenhuma lista criada</strong><span>Este perfil ainda não criou listas.</span></div>
-            ) : (
-              <div className="social-private-state"><Users size={25} /><strong>Biblioteca e listas para seguidores</strong><p>Siga @{selectedProfile.username} para acompanhar seus animes e listas.</p><button className="primary-button" onClick={toggleFollow} disabled={busy}><UserPlus size={15} />Seguir para ver o perfil</button></div>
-            )}
-          </>
-        )}
-          </div>
+          <div className="community-page">{profileContent}</div>
         </section>
       </div>
     );
   }
-
   return (
     <div className="overlay social-community-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
       <section className="modal social-community-modal" role="dialog" aria-modal="true" aria-label="Buscar usuários">
@@ -2195,7 +2241,7 @@ function CommunityPage({ open, onClose, currentUserId, openMyProfileSignal = 0, 
       {error && <div className="social-error">{error}</div>}
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Buscando usuários...</div> : query.trim().length >= 2 ? searchResults.length ? (
         <div className="social-user-grid">
-          {searchResults.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} hint="Abrir perfil" />)}
+          {searchResults.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => onOpenProfile ? onOpenProfile(profile, query) : openProfile(profile)} hint="Abrir perfil" />)}
         </div>
       ) : <div className="social-empty"><Users size={23} /><strong>Nenhum usuário encontrado</strong><span>Confira o nome ou @usuário e tente novamente.</span></div> : (
         <div className="social-discover-empty"><Users size={25} /><strong>Encontre pessoas no Kataru</strong><p>Digite um nome ou @usuário para abrir o perfil, seguir e acompanhar bibliotecas e listas.</p></div>

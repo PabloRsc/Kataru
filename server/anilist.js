@@ -14,6 +14,20 @@ const MEDIA_FIELDS = `
   averageScore
   status
   format
+  startDate { year month day }
+  endDate { year month day }
+  relations {
+    edges {
+      relationType(version: 2)
+      node {
+        idMal
+        format
+        title { romaji english native }
+        startDate { year month day }
+        endDate { year month day }
+      }
+    }
+  }
   nextAiringEpisode { episode airingAt }
 `;
 
@@ -62,6 +76,14 @@ export async function fetchAniListByMalId(malId) {
   return data.Media;
 }
 
+const dateFromAniList = value => {
+  if (!value?.year) return null;
+  const year = String(value.year);
+  const month = String(value.month || 1).padStart(2, '0');
+  const day = String(value.day || 1).padStart(2, '0');
+  return year + '-' + month + '-' + day;
+};
+
 export function toJikanShape(item) {
   const status = String(item.status || '').toUpperCase();
   const nextAiringNumber = Number(item.nextAiringEpisode?.episode || 0);
@@ -84,7 +106,20 @@ export function toJikanShape(item) {
     episodes_available: episodesAvailable,
     status: item.status || null,
     type: ({ MOVIE: 'Movie', TV_SHORT: 'TV' }[item.format] || item.format || ''),
-    year: item.seasonYear ?? null,
+    aired: {
+      from: { date: dateFromAniList(item.startDate), prop: { from: { year: item.startDate?.year || null } } },
+      to: { date: dateFromAniList(item.endDate), prop: { to: { year: item.endDate?.year || null } } }
+    },
+    related_anime: (item.relations?.edges || [])
+      .filter(edge => Number.isSafeInteger(edge.node?.idMal) && edge.node.idMal > 0)
+      .map(edge => ({
+        mal_id: edge.node.idMal,
+        title: edge.node.title?.romaji || edge.node.title?.native || edge.node.title?.english || 'Sem título',
+        relation: edge.relationType || '',
+        format: ({ MOVIE: 'Movie', TV_SHORT: 'TV' }[edge.node.format] || edge.node.format || ''),
+        release_date: dateFromAniList(edge.node.startDate)
+      })),
+    year: item.startDate?.year || item.seasonYear || null,
     season: item.season?.toLowerCase() || null,
     genres: (item.genres || []).map(name => ({ name })),
     score: item.averageScore == null ? null : item.averageScore / 10

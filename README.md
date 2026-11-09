@@ -10,7 +10,7 @@ A navegação está organizada em quatro áreas:
 - **Biblioteca:** visualização em grade ou lista, busca, filtros por status, gênero, ano, formato e nota, além de ordenação.
 - **Descobrir:** títulos em alta, mais bem avaliados e navegação por gêneros, com capas e inclusão manual na biblioteca. Não inclui calendário de lançamentos.
 - **Listas:** listas automáticas por status e listas temáticas criadas pelo usuário.
-- **Pessoas:** busca por nome de usuário, seguir/deixar de seguir, perfis com estatísticas, biblioteca e listas de pessoas seguidas.
+- **Comunidade:** a lupa abre uma janela para buscar usuários por @ ou nome de exibição. Ao selecionar uma pessoa, o perfil abre em página própria com seguir/deixar de seguir, estatísticas, biblioteca e listas compartilhadas.
 
 Os detalhes de cada anime incluem status, progresso por episódio, avaliação pessoal por estrelas, anotações, datas, reassistidas e informações do catálogo. A edição permite ajustar título exibido e total de episódios manualmente, além de adicionar um título sem catálogo.
 
@@ -38,12 +38,13 @@ Sem variáveis Supabase, o app permanece em modo local para desenvolvimento. Os 
 3. Execute **supabase/auth-profiles-setup.sql** para criar perfis e a verificação segura de nomes de usuário.
 4. Execute **supabase/social-follows-migration.sql** para habilitar descoberta de perfis, seguidores e projeções seguras de bibliotecas/listas compartilhadas.
 5. Em instalações que já receberam a migração social anterior, execute **supabase/social-follows-privacy-hardening.sql** para restringir a projeção aos campos não pessoais.
-6. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
-7. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
-8. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
-9. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
+6. Em contas/perfis sociais já existentes, execute **supabase/profile-identity-migration.sql** para alinhar a data pública à data original da conta e normalizar nomes genéricos de perfis antigos.
+7. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
+8. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
+9. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
+10. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
 
-A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha, opção Google, confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. Com Supabase configurado, a coleção exige sessão autenticada.
+A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha, opção Google, confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. O nome de usuário público também pode ser alterado depois, em Meu perfil → Editar perfil; o e-mail de login não é alterado. Com Supabase configurado, a coleção exige sessão autenticada.
 
 **Google OAuth:** o código já inicia o fluxo, mas é necessário habilitar Google em Authentication → Providers, inserir o OAuth Client ID/Secret do Google Cloud e cadastrar o callback do Supabase no Google Cloud. A URL de retorno do site também deve estar na lista de Redirect URLs do Supabase.
 

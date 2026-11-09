@@ -2819,23 +2819,48 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
 
 function StarRating({ value, onChange }) {
   const currentValue = Math.max(0, Math.min(5, Number(value) || 0));
+  const [hoverValue, setHoverValue] = useState(null);
+  const previewValue = hoverValue ?? currentValue;
+
+  function valueAtPointer(star, event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return star - (event.clientX - rect.left < rect.width / 2 ? 0.5 : 0);
+  }
+
   return (
-    <div className="star-rating" role="group" aria-label="Sua nota de zero a cinco estrelas, com intervalos de meia estrela">
+    <div
+      className="star-rating"
+      role="group"
+      aria-label="Sua nota de zero a cinco estrelas, com intervalos de meia estrela"
+      onPointerLeave={() => setHoverValue(null)}
+      onBlur={event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setHoverValue(null);
+      }}
+    >
       {[1, 2, 3, 4, 5].map(star => {
-        const fill = Math.max(0, Math.min(1, currentValue - (star - 1)));
+        const fill = Math.max(0, Math.min(1, previewValue - (star - 1)));
         return (
           <button
             type="button"
             key={star}
             className={fill > 0 ? 'filled' : ''}
+            onPointerEnter={event => {
+              if (event.pointerType !== 'touch') setHoverValue(valueAtPointer(star, event));
+            }}
+            onPointerMove={event => {
+              if (event.pointerType !== 'touch') setHoverValue(valueAtPointer(star, event));
+            }}
+            onFocus={() => setHoverValue(star)}
             onClick={event => {
-              const rect = event.currentTarget.getBoundingClientRect();
-              const clickedLeftHalf = event.detail !== 0 && event.clientX - rect.left < rect.width / 2;
-              const nextValue = star - (clickedLeftHalf ? 0.5 : 0);
+              const nextValue = event.detail === 0
+                ? star
+                : valueAtPointer(star, event);
               onChange(Math.abs(nextValue - currentValue) < 0.001 ? 0 : nextValue);
+              setHoverValue(null);
             }}
             aria-label={star + ' estrelas; metade esquerda para ' + (star - 0.5)}
-            title={'Clique na metade esquerda para ' + (star - 0.5) + ' ou na direita para ' + star}
+            aria-pressed={Math.abs(currentValue - star) < 0.001}
+            title={'Passe o mouse para pré-visualizar; clique na metade esquerda para ' + (star - 0.5) + ' ou na direita para ' + star}
           >
             <span className="star-rating-symbol">
               <Star className="star-rating-empty" size={23} />

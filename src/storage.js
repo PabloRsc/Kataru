@@ -107,6 +107,113 @@ export async function deleteAnime(id) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(all.filter(item => String(item.id) !== String(id))));
 }
 
+export async function searchKataruProfiles(query, limit = 20) {
+  const user = await requireUser();
+  const term = String(query || '').trim().replace(/[%,()]/g, ' ');
+  if (term.length < 2) return [];
+  const { data, error } = await supabase.from('kataru_profiles')
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .neq('user_id', user.id)
+    .ilike('username', '%' + term + '%')
+    .order('username', { ascending: true })
+    .limit(Math.min(40, Math.max(1, Number(limit) || 20)));
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getKataruProfile(userId) {
+  await requireUser();
+  const { data, error } = await supabase.from('kataru_profiles')
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+export async function getCurrentKataruProfile() {
+  const user = await requireUser();
+  return getKataruProfile(user.id);
+}
+
+export async function getKataruSocialStats(userId) {
+  await requireUser();
+  const [followers, following] = await Promise.all([
+    supabase.from('kataru_follows').select('follower_id', { count: 'exact', head: true }).eq('followed_id', userId),
+    supabase.from('kataru_follows').select('followed_id', { count: 'exact', head: true }).eq('follower_id', userId)
+  ]);
+  if (followers.error) throw followers.error;
+  if (following.error) throw following.error;
+  return { followers: followers.count || 0, following: following.count || 0 };
+}
+
+export async function isFollowingKataruUser(userId) {
+  const user = await requireUser();
+  const { data, error } = await supabase.from('kataru_follows')
+    .select('followed_id')
+    .eq('follower_id', user.id)
+    .eq('followed_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
+export async function followKataruUser(userId) {
+  const user = await requireUser();
+  if (user.id === userId) throw new Error('Você não pode seguir sua própria conta.');
+  const { error } = await supabase.from('kataru_follows')
+    .insert({ follower_id: user.id, followed_id: userId });
+  if (error && error.code !== '23505') throw error;
+  return true;
+}
+
+export async function unfollowKataruUser(userId) {
+  const user = await requireUser();
+  const { error } = await supabase.from('kataru_follows')
+    .delete()
+    .eq('follower_id', user.id)
+    .eq('followed_id', userId);
+  if (error) throw error;
+  return true;
+}
+
+export async function getFollowingKataruProfiles() {
+  const user = await requireUser();
+  const { data: follows, error: followError } = await supabase.from('kataru_follows')
+    .select('followed_id, created_at')
+    .eq('follower_id', user.id)
+    .order('created_at', { ascending: false });
+  if (followError) throw followError;
+  const ids = (follows || []).map(row => row.followed_id).filter(Boolean);
+  if (!ids.length) return [];
+  const { data: profiles, error } = await supabase.from('kataru_profiles')
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .in('user_id', ids);
+  if (error) throw error;
+  const byId = new Map((profiles || []).map(profile => [profile.user_id, profile]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+
+export async function getFollowedKataruAnime(userId) {
+  await requireUser();
+  const { data, error } = await supabase.from('kataru_shared_anime')
+    .select('*')
+    .eq('owner_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(fromRow);
+}
+
+export async function getFollowedKataruLists(userId) {
+  await requireUser();
+  const { data, error } = await supabase.from('kataru_shared_lists')
+    .select('*')
+    .eq('owner_id', userId)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(fromListRow);
+}
+
 export async function getAnimeLists() {
   if (supabase) {
     const user = await requireUser();

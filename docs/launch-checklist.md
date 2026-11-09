@@ -12,10 +12,10 @@ Este checklist registra o que foi confirmado por inspeção de código, consulta
 |---|---|---|
 | Login por e-mail e senha | Implementado no app | `src/AuthGate.jsx` |
 | Recuperação e confirmação de e-mail | Implementadas no app | Confirmar URL Configuration e entrega de e-mails |
-| Google Login | Fluxo implementado no app; provedor não confirmado | Habilitar Google em Supabase Auth e informar as credenciais OAuth |
-| SMTP próprio | Não confirmado | Escolher provedor SMTP e configurar credenciais no Supabase |
-| Domínio próprio | Não escolhido / ainda não verificado | Definir domínio antes de registrar e configurar na Vercel |
-| Acesso público do Preview | Não confirmado | A inspeção administrativa da Vercel requer autorização da equipe |
+| Google Login | Fluxo implementado no app; estado do provedor ainda não foi possível ler pela conexão Supabase | Conferir em Authentication → Providers e concluir OAuth no painel |
+| SMTP próprio | Não confirmado pela conexão de leitura | Conferir em Authentication → SMTP Settings; escolher provedor e cadastrar as credenciais no painel |
+| Domínio próprio | Nenhum domínio personalizado anexado | O projeto só tem o domínio Vercel `kataru-two.vercel.app` verificado; escolher um domínio próprio |
+| Acesso público do Preview | Protegido por SSO | Vercel confirmou `ssoProtection.enabled=true` e `deploymentType=all_except_custom_domains`; Preview exige login da equipe |
 | Verificação de senhas vazadas | Desativada | O Supabase informa que este recurso requer plano Pro ou superior |
 | Termos e Privacidade | Minutas beta, incompletas | Completar dados do responsável e validar conteúdo antes de lançamento público |
 | RLS das bibliotecas/listas | Ativo | Verificação do projeto: `anime_collection` está com RLS ligado |
@@ -53,17 +53,28 @@ A senha SMTP é um segredo: inserir diretamente no painel do Supabase, nunca no 
 
 ## Domínio próprio e acesso público
 
-O domínio definitivo ainda precisa ser escolhido. Depois da escolha:
+**Inspeção administrativa realizada em 9 de novembro de 2026, após aprovação do acesso da equipe Vercel:**
 
-1. Registrar ou confirmar a titularidade do domínio.
-2. Adicionar o domínio ao projeto Kataru na Vercel.
-3. Configurar os registros DNS indicados pela Vercel e verificar o domínio.
-4. Escolher o domínio canônico e configurar redirecionamento do domínio alternativo, se necessário.
-5. Atualizar Site URL e Redirect URLs no Supabase.
+- O projeto Vercel `kataru` está com SSO Protection ativada.
+- A modalidade atual é `all_except_custom_domains`: os deployments ficam protegidos, exceto quando acessados por domínios personalizados anexados ao projeto.
+- Password Protection está desativada; isso não torna o Preview público, porque a proteção SSO está ativa.
+- O único domínio anexado e verificado retornado pela listagem do projeto é `kataru-two.vercel.app`, que é um subdomínio gerenciado pela Vercel, não um domínio personalizado.
+- Não há domínio próprio anexado.
+- O Preview mais recente da branch `refine/mockup-fidelity` está `READY`, no commit `e1aba7d298c0801ac69e4589d8543469f7d2e7d6`, mas exige autenticação SSO da equipe.
+- Há um deployment de produção `READY` da branch `main`, no commit `bcb73d1b17430714c26160e8fe6545f7ebfc7997`. As melhorias do PR #2 ainda não foram publicadas em produção.
+- As variáveis `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` existem nos ambientes Preview e Production da Vercel; os valores foram mantidos ocultos durante a inspeção.
+
+**Caminho recomendado para abrir o app aos usuários sem expor os Previews:**
+
+1. Escolher ou registrar um domínio próprio.
+2. Adicionar esse domínio ao projeto Kataru na Vercel e configurar os registros DNS solicitados.
+3. A modalidade SSO atual exclui domínios personalizados da proteção; manter SSO ativado para continuar protegendo os URLs de Preview.
+4. Definir qual deployment/branch será publicado em Production. O PR #2 está aberto e a `main` não recebeu essas alterações.
+5. Atualizar Site URL e Redirect URLs no Supabase para o domínio canônico e os ambientes de teste.
 6. Atualizar URLs de OAuth, e-mail e documentos legais.
-7. Conferir Deployment Protection na Vercel. O Preview só pode ser considerado público se uma janela anônima conseguir abri-lo sem login da Vercel. O login do próprio Kataru continuará sendo exigido para bibliotecas individuais.
+7. Testar o domínio próprio em janela anônima. O acesso público ao site não deve remover o login do Kataru nem a privacidade das bibliotecas individuais.
 
-A inspeção das configurações da equipe Vercel está pendente de aprovação do consentimento de acesso da conexão à equipe Kataru. Depois da aprovação, revisar domínios, proteção do projeto e deployment Preview.
+Não desativar SSO Protection do projeto inteiro sem uma decisão explícita: a configuração atual permite separar o domínio público dos Preview deployments protegidos.
 
 ## Proteção de senhas vazadas
 

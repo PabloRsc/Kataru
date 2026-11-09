@@ -184,7 +184,21 @@ const franchiseKeys = anime => getAnimeAliases(anime)
   .map(normalizeFranchiseTitle)
   .filter(key => key.split(' ').length >= 2 && key.length >= 8);
 
-function groupAnimeByFranchise(entries) {
+const compareLibraryOrder = (a, b, sortMode = 'release') => {
+  if (sortMode === 'title') return displayTitle(a).localeCompare(displayTitle(b), 'pt-BR');
+  if (sortMode === 'rating') return Number(b.rating_personal || 0) - Number(a.rating_personal || 0);
+  if (sortMode === 'progress') {
+    const left = Number(a.episode_current || 0) / (totalEpisodes(a) || 999999);
+    const right = Number(b.episode_current || 0) / (totalEpisodes(b) || 999999);
+    return right - left;
+  }
+  if (sortMode === 'added') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  if (sortMode === 'updated') return sortByRecent(a, b);
+  if (sortMode === 'release-desc') return compareReleaseDate(b, a);
+  return compareReleaseDate(a, b);
+};
+
+function groupAnimeByFranchise(entries, sortMode = 'release') {
   const parent = new Map((entries || []).map(anime => [String(anime.mal_id), String(anime.mal_id)]));
   const find = id => {
     const current = parent.get(id);
@@ -230,7 +244,7 @@ function groupAnimeByFranchise(entries) {
         items: ordered
       };
     })
-    .sort((a, b) => compareReleaseDate(a.items[0], b.items[0]));
+    .sort((a, b) => compareLibraryOrder(a.items[0], b.items[0], sortMode));
 };
 const getInitials = value => String(value || 'K').trim().slice(0, 1).toUpperCase();
 
@@ -1345,6 +1359,12 @@ function LibraryPage({
   const genres = Array.from(new Set(allItems.flatMap(anime => anime.genres || []))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const years = Array.from(new Set(allItems.map(anime => anime.year).filter(Boolean))).sort((a, b) => b - a);
   const filtersActive = Boolean(genreFilter || yearFilter || formatFilter || ratingFilter);
+  const orderedGroups = groupAnimeByFranchise(items, sort);
+  const standaloneItems = orderedGroups
+    .filter(group => group.items.length === 1)
+    .map(group => group.items[0])
+    .sort((a, b) => compareLibraryOrder(a, b, sort));
+  const firstStandaloneKey = orderedGroups.find(group => group.items.length === 1)?.key || null;
   function clearFilters() { setGenreFilter(''); setYearFilter(''); setFormatFilter(''); setRatingFilter(''); }
 
   return (
@@ -1389,19 +1409,29 @@ function LibraryPage({
       <div className="results-summary"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{filter === 'all' ? 'Todos os status' : statusLabel(filter)}</span></div>
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando sua biblioteca...</div> : items.length ? (
         <div className="library-groups">
-          {groupAnimeByFranchise(items).map(group => (
-            <section className={group.items.length > 1 ? 'library-franchise' : 'library-franchise-single'} key={group.key}>
-              {group.items.length > 1 && (
+          {orderedGroups.map(group => {
+            if (group.items.length === 1) {
+              if (group.key !== firstStandaloneKey) return null;
+              return (
+                <section className="library-franchise-single" key="library-standalone">
+                  {gridMode === 'grid'
+                    ? <div className="library-grid">{standaloneItems.map(anime => <PosterCard key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>
+                    : <div className="library-list">{standaloneItems.map(anime => <AnimeRow key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>}
+                </section>
+              );
+            }
+            return (
+              <section className="library-franchise" key={group.key}>
                 <div className="library-franchise-heading">
                   <div><h2>{group.title}</h2><p>Temporadas e conteúdos relacionados</p></div>
                   <span>{group.items.length} títulos · {formatReleaseLabel(group.items[0])} – {formatReleaseLabel(group.items[group.items.length - 1])}</span>
                 </div>
-              )}
-              {gridMode === 'grid'
-                ? <div className="library-grid">{group.items.map(anime => <PosterCard key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>
-                : <div className="library-list">{group.items.map(anime => <AnimeRow key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>}
-            </section>
-          ))}
+                {gridMode === 'grid'
+                  ? <div className="library-grid">{group.items.map(anime => <PosterCard key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>
+                  : <div className="library-list">{group.items.map(anime => <AnimeRow key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>}
+              </section>
+            );
+          })}
         </div>
       ) : (
         <div className="empty-state">

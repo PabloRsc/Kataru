@@ -126,6 +126,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .poster-card:hover .poster-art img { transform: scale(1.045); filter: brightness(.82); }
 .poster-fallback, .row-fallback, .detail-poster-fallback, .editor-cover-fallback, .result-cover-fallback { display: grid; place-items: center; width: 100%; height: 100%; color: #8882B9; background: linear-gradient(145deg, #29283C, #1D202D); }
 .status-pill { position: absolute; top: 8px; left: 8px; z-index: 1; max-width: calc(100% - 16px); overflow: hidden; padding: 4px 7px; border: 1px solid #FFFFFF20; border-radius: 5px; color: #F8F7FC; background: #11131BCD; font-size: 8px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; backdrop-filter: blur(6px); }
+.poster-format-pill { position: absolute; left: 8px; bottom: 8px; z-index: 2; max-width: calc(100% - 16px); overflow: hidden; padding: 4px 7px; color: #E6E1FF; background: #171626E8; border: 1px solid #A99BFF55; border-radius: 5px; font-size: 8px; font-weight: 800; letter-spacing: .25px; text-overflow: ellipsis; white-space: nowrap; backdrop-filter: blur(6px); }
 .tone-purple { --tone: var(--purple); }
 .tone-green { --tone: var(--green); }
 .tone-yellow { --tone: var(--yellow); }

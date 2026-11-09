@@ -2137,7 +2137,7 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
   if (pageMode && !selectedProfile) {
     return (
       <div className="community-page community-profile-page">
-        {loading ? (
+        {loading || openMyProfileSignal > 0 ? (
           <div className="loading-block"><LoaderCircle className="spin" />Carregando perfil...</div>
         ) : (
           <div className="social-profile-load-error">

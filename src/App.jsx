@@ -28,6 +28,7 @@ const STATUSES = [
 const EMPTY_FORM = {
   status: 'planned',
   episode_current: 0,
+  episode_unknown: false,
   rating_personal: '',
   rewatch_count: 0,
   started_at: '',
@@ -511,7 +512,7 @@ export default function App() {
           id: anime.id,
           status: anime.status,
           episode_current: anime.episode_current,
-          rating_personal: anime.rating_personal,
+            episode_unknown: Boolean(anime.episode_unknown),          rating_personal: anime.rating_personal,
           rewatch_count: anime.rewatch_count,
           started_at: anime.started_at,
           completed_at: anime.completed_at,
@@ -627,6 +628,7 @@ export default function App() {
     setForm({
       status: anime.status || 'planned',
       episode_current: anime.episode_current ?? 0,
+      episode_unknown: Boolean(anime.episode_unknown),
       rating_personal: anime.rating_personal ?? '',
       rewatch_count: anime.rewatch_count ?? 0,
       started_at: anime.started_at || '',
@@ -660,7 +662,7 @@ export default function App() {
             mal_id: editor.mal_id,
             status: editor.status,
             episode_current: editor.episode_current,
-            rating_personal: editor.rating_personal,
+            episode_unknown: Boolean(editor.episode_unknown),            rating_personal: editor.rating_personal,
             rewatch_count: editor.rewatch_count,
             started_at: editor.started_at,
             completed_at: editor.completed_at,
@@ -681,9 +683,11 @@ export default function App() {
         mal_id: Number(catalogEditor.mal_id),
         title: form.is_manual ? form.title.trim() : (catalogEditor.title || form.title),
         episode_current: form.status === 'planned' ? 0
+          : form.episode_unknown && ['paused', 'dropped'].includes(form.status) ? 0
           : form.status === 'completed' ? completedCount
           : Math.max(0, Number(form.episode_current || 0)),
-        rating_personal: form.rating_personal === '' ? null : Number(form.rating_personal),
+        episode_unknown: ['paused', 'dropped'].includes(form.status) && Boolean(form.episode_unknown),
+        rating_personal: form.status === 'paused' || form.rating_personal === '' ? null : Number(form.rating_personal),
         rewatch_count: form.status === 'completed' ? Math.max(0, Number(form.rewatch_count || 0)) : Number(editor.rewatch_count || 0),
         started_at: form.status === 'watching' ? (form.started_at || new Date().toISOString().slice(0, 10)) : editor.started_at || null,
         completed_at: form.status === 'completed' ? (form.completed_at || new Date().toISOString().slice(0, 10)) : null,
@@ -734,7 +738,7 @@ export default function App() {
       notify('Você já chegou ao último episódio disponível informado pelo catálogo.');
       return;
     }
-    let updated = { ...anime, episode_current: next };
+    let updated = { ...anime, episode_current: next, episode_unknown: false };
     if (total && next >= total) {
       updated.status = 'completed';
       updated.completed_at = updated.completed_at || new Date().toISOString().slice(0, 10);
@@ -757,7 +761,7 @@ export default function App() {
         created_at: current.created_at,
         status: current.status,
         episode_current: current.episode_current,
-        rating_personal: current.rating_personal,
+            episode_unknown: Boolean(current.episode_unknown),        rating_personal: current.rating_personal,
         notes: current.notes,
         rewatch_count: current.rewatch_count,
         started_at: current.started_at,
@@ -777,7 +781,16 @@ export default function App() {
   }
 
   async function changeStatus(anime, status) {
-    const updated = { ...anime, status };
+    const keepsUnknownEpisode = ['paused', 'dropped'].includes(status)
+      && ['paused', 'dropped'].includes(anime.status)
+      && Boolean(anime.episode_unknown);
+    const updated = {
+      ...anime,
+      status,
+      episode_unknown: keepsUnknownEpisode,
+      rating_personal: status === 'paused' ? null : anime.rating_personal
+    };
+    if (keepsUnknownEpisode) updated.episode_current = 0;
     if (status === 'planned') {
       updated.episode_current = 0;
       updated.completed_at = null;
@@ -793,6 +806,7 @@ export default function App() {
   }
 
   async function changeRating(anime, stars) {
+    if (anime.status === 'paused') return null;
     return persistAnime({ ...anime, rating_personal: stars ? stars * 2 : null }, 'Nota atualizada.');
   }
 
@@ -821,7 +835,7 @@ export default function App() {
         id: anime.id,
         status: anime.status,
         episode_current: anime.episode_current,
-        rating_personal: anime.rating_personal,
+            episode_unknown: Boolean(anime.episode_unknown),        rating_personal: anime.rating_personal,
         notes: anime.notes,
         display_title: anime.display_title,
         episodes_total_manual: anime.episodes_total_manual,
@@ -860,7 +874,7 @@ export default function App() {
             id: anime.id,
             status: anime.status,
             episode_current: anime.episode_current,
-            rating_personal: anime.rating_personal,
+            episode_unknown: Boolean(anime.episode_unknown),            rating_personal: anime.rating_personal,
             notes: anime.notes,
             display_title: anime.display_title,
             episodes_total_manual: anime.episodes_total_manual,
@@ -2775,8 +2789,18 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
             <div className="status-segment">{STATUSES.map(status => <button key={status.id} className={anime.status === status.id ? 'selected tone-' + status.tone : ''} onClick={() => onStatusChange(status.id)}>{status.label}</button>)}</div>
           </div>
 
-          <div className="detail-progress-card">
-            <div className="progress-card-top">
+          {anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? (
+            <div className="detail-progress-card episode-unknown-detail">
+              <div className="episode-unknown-icon"><Clock3 size={22} /></div>
+              <div>
+                <strong>{anime.status === 'paused' ? 'Você não lembra onde pausou' : 'Você não lembra onde parou'}</strong>
+                <p>O episódio não foi registrado para este anime.</p>
+                <button className="text-button" onClick={onEdit}>Informar episódio</button>
+              </div>
+            </div>
+          ) : (
+            <div className="detail-progress-card">
+              <div className="progress-card-top">
               <div><span className="eyebrow">SEU PROGRESSO</span><strong>{current}<small>{total ? ' / ' + total : available ? ' / ' + available + ' lançados' : ' episódios registrados'}</small></strong><span>episódios assistidos</span></div>
               <div className="progress-ring" style={{ '--progress': progress + '%' }}><strong>{progressTotal ? progress : '—'}<small>{progressTotal ? '%' : ''}</small></strong></div>
             </div>
@@ -2793,12 +2817,15 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
             </div>
             {!progressTotal && <p className="episode-availability-note">O catálogo ainda não informou quantos episódios estão disponíveis. Atualize os dados do anime para consultar o catálogo.</p>}
           </div>
+          )}
 
-          <div className="detail-rating-notes">
-            {anime.status === 'watching'
-              ? <section className="rating-panel rating-panel-locked"><div className="detail-block-heading"><span>SUA NOTA</span><strong>Avaliação após concluir</strong></div><p>Finalize o anime para registrar sua avaliação. Uma nota salva anteriormente será mantida.</p></section>
-              : <section className="rating-panel"><div className="detail-block-heading"><span>SUA NOTA</span><strong>{anime.rating_personal ? (Number(anime.rating_personal) / 2).toFixed(1) + ' / 5' : 'Ainda sem nota'}</strong></div><StarRating value={ratingStars} onChange={onRatingChange} /></section>}
-          </div>
+          {anime.status !== 'paused' && (
+            <div className="detail-rating-notes">
+              {anime.status === 'watching'
+                ? <section className="rating-panel rating-panel-locked"><div className="detail-block-heading"><span>SUA NOTA</span><strong>Avaliação após concluir</strong></div><p>Finalize o anime para registrar sua avaliação. Uma nota salva anteriormente será mantida.</p></section>
+                : <section className="rating-panel"><div className="detail-block-heading"><span>SUA NOTA</span><strong>{anime.rating_personal ? (Number(anime.rating_personal) / 2).toFixed(1) + ' / 5' : 'Ainda sem nota'}</strong></div><StarRating value={ratingStars} onChange={onRatingChange} /></section>}
+            </div>
+          )}
 
           <div className="detail-info-grid">
             <div><span>TEMPORADA</span><strong>{anime.season || '—'}{anime.year ? ' ' + anime.year : ''}</strong></div>
@@ -2955,6 +2982,7 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
   const isDirty = catalogRestored || (!isNew && (
     form.status !== (anime.status || 'planned') ||
     String(form.episode_current ?? 0) !== String(anime.episode_current ?? 0) ||
+    Boolean(form.episode_unknown) !== Boolean(anime.episode_unknown) ||
     String(form.rating_personal ?? '') !== String(anime.rating_personal ?? '') ||
     String(form.rewatch_count ?? 0) !== String(anime.rewatch_count ?? 0) ||
     String(form.started_at || '') !== String(anime.started_at || '') ||
@@ -2967,7 +2995,8 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
   const maxEpisode = total || available || undefined;
   const episode = Number(form.episode_current || 0);
   const needsEpisode = ['watching', 'paused', 'dropped'].includes(form.status);
-  const showRating = !['planned', 'watching'].includes(form.status);
+  const allowsUnknownEpisode = ['paused', 'dropped'].includes(form.status);
+  const showRating = !['planned', 'watching', 'paused'].includes(form.status);
   const dateShortcuts = key => <div className="date-shortcuts">
     <button type="button" onClick={() => update(key, today)}>Hoje</button>
     <button type="button" onClick={() => update(key, '')}>Não lembro</button>
@@ -2977,7 +3006,10 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
     status,
     episode_current: status === 'planned' ? 0
       : status === 'completed' ? (total || available || Number(current.episode_current || 0))
+      : current.episode_unknown && ['paused', 'dropped'].includes(status) ? 0
       : current.episode_current,
+    episode_unknown: ['paused', 'dropped'].includes(status) ? Boolean(current.episode_unknown) : false,
+    rating_personal: status === 'paused' ? '' : current.rating_personal,
     started_at: status === 'watching' && !current.started_at ? today : current.started_at,
     completed_at: status === 'completed' && !current.completed_at ? today : current.completed_at
   }));
@@ -2999,10 +3031,27 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
           {form.status === 'planned' && <p className="status-guidance">O anime será salvo em “Quero assistir”. Não é necessário preencher progresso ou datas.</p>}
           {form.status === 'watching' && <p className="status-guidance">Informe o episódio em que você está. A data de início é opcional.</p>}
           {form.status === 'completed' && <p className="status-guidance">Ao salvar como Assistido, o Kataru considera a obra concluída. Não precisa informar o número de episódios.</p>}
-          {form.status === 'paused' && <p className="status-guidance">Informe o episódio em que você pausou.</p>}
-          {form.status === 'dropped' && <p className="status-guidance">Informe o episódio em que você parou de assistir.</p>}
+          {form.status === 'paused' && <p className="status-guidance">Informe onde você pausou ou marque que não lembra o episódio.</p>}
+          {form.status === 'dropped' && <p className="status-guidance">Informe onde parou de assistir ou marque que não lembra o episódio.</p>}
         </div>
-        {needsEpisode && (
+        {allowsUnknownEpisode && (
+          <label className="episode-unknown-toggle">
+            <input
+              type="checkbox"
+              checked={Boolean(form.episode_unknown)}
+              onChange={event => setForm(current => ({
+                ...current,
+                episode_unknown: event.target.checked,
+                episode_current: event.target.checked ? 0 : Number(current.episode_current || 0)
+              }))}
+            />
+            <span>
+              <strong>{form.status === 'paused' ? 'Não lembro onde pausei' : 'Não lembro onde parei'}</strong>
+              <small>O episódio ficará sem informação de progresso.</small>
+            </span>
+          </label>
+        )}
+        {needsEpisode && !form.episode_unknown && (
           <label className="field episode-current-field">
             <span>{form.status === 'dropped' ? 'Episódio em que parou' : form.status === 'paused' ? 'Episódio em que pausou' : 'Episódio atual'}</span>
             <div className="number-stepper">

@@ -102,3 +102,6 @@ npm run preview
 - **src/styles.css:** identidade visual e layouts responsivos.
 - **supabase/schema.sql:** schema completo para novas instalações.
 - **supabase/redesign-migration.sql:** migração de bancos existentes para os campos e listas do redesign.
+
+
+A biblioteca compartilhada usa os mesmos cards da biblioteca pessoal, exibe a avaliação do proprietário e permite clicar na capa para abrir o fluxo padrão de adição à sua própria biblioteca. O cadastro do proprietário não é alterado.

@@ -71,6 +71,10 @@ A Biblioteca separa a coleção por formato (Séries TV, Filmes, OVAs, ONAs, Esp
 
 A área Descobrir consulta títulos populares, mais bem avaliados e gêneros sob demanda. A Jikan é a fonte principal; se uma consulta falhar ou retornar uma lista vazia, a função serverless tenta a AniList GraphQL como alternativa. A categoria de mais bem avaliados também aplica a ordenação por nota na fonte alternativa. Os títulos encontrados permanecem apenas no catálogo externo e só entram em anime_collection quando o usuário escolhe adicioná-los à biblioteca. No desenvolvimento local, o Vite encaminha as rotas de catálogo para a Jikan.
 
+## Preparação para lançamento
+
+O checklist de configuração e lançamento, com o estado verificado de OAuth, SMTP, domínio, acesso público, segurança de senhas e documentos legais, está em [docs/launch-checklist.md](docs/launch-checklist.md).
+
 ## Build
 
 ~~~bash

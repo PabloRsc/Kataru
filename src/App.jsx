@@ -496,7 +496,9 @@ export default function App() {
     else if (sort === 'rating') data.sort((a, b) => Number(b.rating_personal || 0) - Number(a.rating_personal || 0));
     else if (sort === 'progress') data.sort((a, b) => (Number(b.episode_current || 0) / (totalEpisodes(b) || 999999)) - (Number(a.episode_current || 0) / (totalEpisodes(a) || 999999)));
     else if (sort === 'added') data.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-    else data.sort(sortByRecent);
+    else if (sort === 'updated') data.sort(sortByRecent);
+    else if (sort === 'release-desc') data.sort((a, b) => compareReleaseDate(b, a));
+    else data.sort(compareReleaseDate);
     return data;
   }, [items, filter, query, sort, genreFilter, yearFilter, formatFilter, ratingFilter]);
 

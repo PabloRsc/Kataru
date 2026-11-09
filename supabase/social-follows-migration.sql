@@ -96,6 +96,10 @@ create policy "Users can update their own Kataru profile"
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
+-- Allow editing only public identity fields; user_id and timestamps remain immutable to clients.
+revoke update on table public.kataru_profiles from authenticated;
+grant update (username, display_name, bio) on table public.kataru_profiles to authenticated;
+
 create table if not exists public.kataru_follows (
   follower_id uuid not null references auth.users(id) on delete cascade,
   followed_id uuid not null references auth.users(id) on delete cascade,

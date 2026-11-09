@@ -2022,3 +2022,48 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 10px;
   line-height: 1.6;
 }
+
+
+.social-username-edit-field {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 10px;
+  color: var(--muted);
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  transition: border-color .16s, box-shadow .16s;
+}
+.social-username-edit-field:focus-within {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px #8B7CFF16;
+}
+.social-username-edit-field > span {
+  color: #B7A9FF;
+  font-size: 12px;
+  font-weight: 700;
+}
+.social-profile-edit .social-username-edit-field input {
+  min-width: 0;
+  padding: 9px 5px;
+  background: transparent;
+  border: 0;
+  font-size: 11px;
+}
+.social-profile-edit .social-username-edit-field input:focus { border: 0; outline: 0; }
+.social-profile-edit label > small {
+  color: var(--muted-2);
+  font-size: 8px;
+  font-weight: 450;
+}
+.social-username-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -7px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+.social-username-feedback.is-good { color: #75D8A5; }
+.social-username-feedback.is-bad { color: #FF929B; }

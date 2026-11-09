@@ -1901,6 +1901,7 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
   const [savingProfile, setSavingProfile] = useState(false);
   const [notice, setNotice] = useState('');
   const searchInputRef = useRef(null);
+  const activeRouteProfileIdRef = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -1964,7 +1965,10 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
   }
 
   async function openProfile(profile) {
-    if (pageMode) onActiveProfileChange?.(profile);
+    if (pageMode) {
+      activeRouteProfileIdRef.current = profile.user_id;
+      onActiveProfileChange?.(profile);
+    }
     setSelectedList(null);
     setConnectionsType(null);
     setConnections([]);
@@ -2005,7 +2009,15 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
   }
 
   useEffect(() => {
-    if (pageMode && initialProfile) openProfile(initialProfile);
+    if (!pageMode) return;
+    if (!initialProfile) {
+      activeRouteProfileIdRef.current = null;
+      return;
+    }
+    if (activeRouteProfileIdRef.current !== initialProfile.user_id) {
+      activeRouteProfileIdRef.current = initialProfile.user_id;
+      openProfile(initialProfile);
+    }
   }, [pageMode, initialProfile?.user_id]);
 
   async function openMyProfile() {

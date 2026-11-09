@@ -80,13 +80,13 @@ create trigger on_kataru_auth_user_created
 
 -- Função de evento do banco: não deve ser exposta como RPC pública.
 -- A execução do event trigger continua sob o proprietário (postgres).
-do $
+do $kataru_hardening$
 begin
   if to_regprocedure('public.rls_auto_enable()') is not null then
     execute 'revoke all privileges on function public.rls_auto_enable() from public, anon, authenticated';
   end if;
 end;
-$;
+$kataru_hardening$;
 
 -- Esta RPC é intencionalmente pública para validar username antes do cadastro;
 -- ela retorna somente um booleano e não expõe os registros de perfil.

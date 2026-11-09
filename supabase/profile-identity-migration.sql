@@ -3,9 +3,18 @@
 -- generic migration label with the generated username for legacy accounts.
 begin;
 
-alter table public.kataru_profiles
-  add constraint kataru_profiles_username_length_check
-  check (char_length(username) between 3 and 20);
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'kataru_profiles_username_length_check'
+      and conrelid = 'public.kataru_profiles'::regclass
+  ) then
+    alter table public.kataru_profiles
+      add constraint kataru_profiles_username_length_check
+      check (char_length(username) between 3 and 20);
+  end if;
+end $$;
 
 update public.kataru_profiles as profile
 set

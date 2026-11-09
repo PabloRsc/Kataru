@@ -29,19 +29,34 @@ export default async function handler(req, res) {
 
     const jikanAnime = jikanResult.status === 'fulfilled' ? jikanResult.value.data : null;
     const aniListAnime = aniListResult.status === 'fulfilled' ? toJikanShape(aniListResult.value) : null;
+    const hasJikanRelations = (jikanAnime?.relations || []).some(group => (group.entry || []).length > 0);
     const anime = {
       ...(jikanAnime || aniListAnime),
       ...(aniListAnime ? {
         episodes: jikanAnime?.episodes ?? aniListAnime.episodes,
         episodes_available: aniListAnime.episodes_available ?? jikanAnime?.episodes_available ?? null,
-        status: jikanAnime?.status || aniListAnime.status
+        status: jikanAnime?.status || aniListAnime.status,
+        year: jikanAnime?.year || aniListAnime.year || null,
+        aired: {
+          ...(jikanAnime?.aired || {}),
+          from: {
+            ...(jikanAnime?.aired?.from || {}),
+            date: jikanAnime?.aired?.from?.date || aniListAnime?.aired?.from?.date || null
+          },
+          to: {
+            ...(jikanAnime?.aired?.to || {}),
+            date: jikanAnime?.aired?.to?.date || aniListAnime?.aired?.to?.date || null
+          }
+        },
+        ...(!hasJikanRelations && Array.isArray(aniListAnime.related_anime)
+          ? { related_anime: aniListAnime.related_anime }
+          : {})
       } : {})
     };
 
     res.setHeader('X-Kataru-Catalog-Source', jikanAnime && aniListAnime ? 'jikan+anilist' : jikanAnime ? 'jikan' : 'anilist-fallback');
     res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
     return res.status(200).json(anime);
-  }
   } catch (jikanError) {
     try {
       const media = await fetchAniListByMalId(numericId);

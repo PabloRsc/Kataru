@@ -36,6 +36,7 @@ export default async function handler(req, res) {
         episodes: jikanAnime?.episodes ?? aniListAnime.episodes,
         episodes_available: aniListAnime.episodes_available ?? jikanAnime?.episodes_available ?? null,
         status: jikanAnime?.status || aniListAnime.status,
+        type: jikanAnime?.type || aniListAnime.type || '',
         year: jikanAnime?.year || aniListAnime.year || null,
         aired: {
           ...(jikanAnime?.aired || {}),

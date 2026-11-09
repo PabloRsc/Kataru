@@ -290,7 +290,7 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [activeList, setActiveList] = useState(null);
   const [filter, setFilter] = useState('all');
-  const [query, setQuery] = useState(initialQuery || '');
+  const [query, setQuery] = useState('');
   const [sort, setSort] = useState('franchise');
   const [genreFilter, setGenreFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');

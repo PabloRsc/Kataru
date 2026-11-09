@@ -13,7 +13,7 @@ import {
   getCurrentKataruProfile, getFollowedKataruAnime, getFollowedKataruLists,
   getFollowingKataruProfiles, getKataruProfile, getKataruRelationProfiles,
   getKataruSocialStats, isFollowingKataruUser, searchKataruProfiles,
-  followKataruUser, unfollowKataruUser, saveAnime, saveAnimeList, storageMode, supabase
+  followKataruUser, unfollowKataruUser, updateKataruProfile, saveAnime, saveAnimeList, storageMode, supabase
 } from './storage';
 
 const STATUSES = [
@@ -1801,6 +1801,377 @@ function ArrowUpRightIcon() { return <ArrowRight size={17} />; }
 
 function CatalogError({ message, onRetry }) {
   return <div className="catalog-error"><div><Compass size={22} /><strong>Catálogo indisponível no momento</strong><p>{message}</p><button className="outline-button" onClick={onRetry}>Tentar novamente</button></div></div>;
+}
+
+
+function SocialAvatar({ profile, size = 'medium' }) {
+  return (
+    <span className={'social-avatar social-avatar-' + size}>
+      {profile?.avatar_url
+        ? <img src={profile.avatar_url} alt="" loading="lazy" />
+        : getInitials(profile?.display_name || profile?.username || 'K')}
+    </span>
+  );
+}
+
+function SocialUserCard({ profile, onOpen, action, hint }) {
+  return (
+    <article className="social-user-card">
+      <button className="social-user-main" onClick={onOpen}>
+        <SocialAvatar profile={profile} />
+        <span className="social-user-copy">
+          <strong>{profile.display_name || profile.username}</strong>
+          <small>@{profile.username}</small>
+          {profile.bio && <span>{profile.bio}</span>}
+          {hint && <small className="social-user-hint">{hint}</small>}
+        </span>
+      </button>
+      {action && <div className="social-user-action">{action}</div>}
+    </article>
+  );
+}
+
+function CommunityPage({ currentUserId }) {
+  const [tab, setTab] = useState('discover');
+  const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [followingProfiles, setFollowingProfiles] = useState([]);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [profileStats, setProfileStats] = useState({ followers: 0, following: 0 });
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [profileAnime, setProfileAnime] = useState([]);
+  const [profileLists, setProfileLists] = useState([]);
+  const [profileTab, setProfileTab] = useState('library');
+  const [selectedList, setSelectedList] = useState(null);
+  const [connections, setConnections] = useState([]);
+  const [connectionsType, setConnectionsType] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [contentLoading, setContentLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ display_name: '', bio: '' });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getFollowingKataruProfiles()
+      .then(profiles => { if (active) setFollowingProfiles(profiles); })
+      .catch(loadError => { if (active) setError(loadError.message || 'Não foi possível carregar quem você segue.'); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const term = query.trim();
+    if (tab !== 'discover' || term.length < 2) {
+      setSearchResults([]);
+      return undefined;
+    }
+    setLoading(true);
+    setError('');
+    const timer = window.setTimeout(() => {
+      searchKataruProfiles(term)
+        .then(profiles => { if (active) setSearchResults(profiles); })
+        .catch(loadError => { if (active) setError(loadError.message || 'Não foi possível pesquisar usuários.'); })
+        .finally(() => { if (active) setLoading(false); });
+    }, 260);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [query, tab]);
+
+  async function loadProfileContent(userId) {
+    setContentLoading(true);
+    try {
+      const [anime, lists] = await Promise.all([
+        getFollowedKataruAnime(userId),
+        getFollowedKataruLists(userId)
+      ]);
+      setProfileAnime(anime);
+      setProfileLists(lists);
+    } catch (loadError) {
+      setProfileAnime([]);
+      setProfileLists([]);
+      setError(loadError.message || 'Não foi possível abrir o conteúdo deste perfil.');
+    } finally {
+      setContentLoading(false);
+    }
+  }
+
+  async function openProfile(profile) {
+    setSelectedList(null);
+    setConnectionsType(null);
+    setConnections([]);
+    setSelectedProfile(profile);
+    setProfileAnime([]);
+    setProfileLists([]);
+    setProfileTab('library');
+    setEditingProfile(false);
+    setNotice('');
+    setError('');
+    setBusy(false);
+    setContentLoading(true);
+    const ownProfile = profile.user_id === currentUserId;
+    try {
+      const [stats, followed] = await Promise.all([
+        getKataruSocialStats(profile.user_id),
+        ownProfile ? Promise.resolve(false) : isFollowingKataruUser(profile.user_id)
+      ]);
+      setProfileStats(stats);
+      setIsFollowing(followed);
+      if (ownProfile || followed) {
+        await loadProfileContent(profile.user_id);
+      } else {
+        setProfileAnime([]);
+        setProfileLists([]);
+        setContentLoading(false);
+      }
+      setProfileForm({
+        display_name: profile.display_name || profile.username || '',
+        bio: profile.bio || ''
+      });
+    } catch (loadError) {
+      setContentLoading(false);
+      setError(loadError.message || 'Não foi possível carregar o perfil.');
+    }
+  }
+
+  async function openMyProfile() {
+    setLoading(true);
+    setError('');
+    try {
+      const profile = await getCurrentKataruProfile();
+      if (!profile) throw new Error('Seu perfil ainda não está disponível. Saia e entre novamente na conta.');
+      await openProfile(profile);
+    } catch (loadError) {
+      setError(loadError.message || 'Não foi possível abrir seu perfil.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function toggleFollow() {
+    if (!selectedProfile || selectedProfile.user_id === currentUserId || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      if (isFollowing) {
+        await unfollowKataruUser(selectedProfile.user_id);
+        setIsFollowing(false);
+        setProfileAnime([]);
+        setProfileLists([]);
+        setProfileStats(current => ({ ...current, followers: Math.max(0, current.followers - 1) }));
+        setFollowingProfiles(current => current.filter(profile => profile.user_id !== selectedProfile.user_id));
+        setNotice('Você deixou de seguir @' + selectedProfile.username + '.');
+      } else {
+        await followKataruUser(selectedProfile.user_id);
+        setIsFollowing(true);
+        setProfileStats(current => ({ ...current, followers: current.followers + 1 }));
+        setNotice('Agora você está seguindo @' + selectedProfile.username + '.');
+        await loadProfileContent(selectedProfile.user_id);
+        setFollowingProfiles(current => current.some(profile => profile.user_id === selectedProfile.user_id)
+          ? current
+          : [selectedProfile, ...current]);
+      }
+    } catch (followError) {
+      setError(followError.message || 'Não foi possível atualizar o relacionamento.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function showConnections(type) {
+    if (!selectedProfile) return;
+    setConnectionsType(type);
+    setConnections([]);
+    setLoading(true);
+    setError('');
+    try {
+      const profiles = await getKataruRelationProfiles(selectedProfile.user_id, type);
+      setConnections(profiles);
+    } catch (connectionError) {
+      setError(connectionError.message || 'Não foi possível carregar esta lista.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    setSavingProfile(true);
+    setError('');
+    try {
+      const updated = await updateKataruProfile(profileForm);
+      setSelectedProfile(updated);
+      setProfileForm({ display_name: updated.display_name || '', bio: updated.bio || '' });
+      setEditingProfile(false);
+      setNotice('Seu perfil foi atualizado.');
+    } catch (saveError) {
+      setError(saveError.message || 'Não foi possível atualizar seu perfil.');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  function returnToPeople() {
+    setSelectedProfile(null);
+    setSelectedList(null);
+    setConnectionsType(null);
+    setConnections([]);
+    setNotice('');
+    setError('');
+  }
+
+  function renderAnimeGrid(entries) {
+    const ordered = groupAnimeByFranchise(entries, 'franchise').flatMap(group => group.items);
+    if (!ordered.length) {
+      return <div className="social-empty"><Library size={23} /><strong>Biblioteca vazia</strong><span>Este perfil ainda não adicionou animes.</span></div>;
+    }
+    return (
+      <div className="social-anime-grid">
+        {ordered.map(anime => (
+          <article className="social-anime-card" key={anime.id}>
+            <div className="social-anime-art">
+              {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <Clapperboard size={22} />}
+              {anime.format && <span>{localizedFormat(anime.format)}</span>}
+            </div>
+            <strong>{displayTitle(anime)}</strong>
+            <small>{formatReleaseLabel(anime)}</small>
+            <em className={'tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</em>
+          </article>
+        ))}
+      </div>
+    );
+  }
+
+  if (selectedProfile) {
+    const ownProfile = selectedProfile.user_id === currentUserId;
+    const visible = ownProfile || isFollowing;
+    const listEntries = selectedList
+      ? (selectedList.anime_ids || []).map(id => profileAnime.find(anime => String(anime.mal_id) === String(id))).filter(Boolean)
+      : [];
+
+    return (
+      <div className="community-page">
+        <button className="back-link" onClick={selectedList ? () => setSelectedList(null) : connectionsType ? () => setConnectionsType(null) : returnToPeople}>
+          <ChevronLeft size={16} />{selectedList ? 'Voltar às listas' : connectionsType ? 'Voltar ao perfil' : 'Voltar para pessoas'}
+        </button>
+        {selectedList ? (
+          <section className="social-list-detail">
+            <div className="social-list-detail-head">
+              <span className="social-list-icon"><List size={23} /></span>
+              <div><p className="eyebrow">LISTA DE @{selectedProfile.username}</p><h1>{selectedList.name}</h1><p>{selectedList.description || 'Uma seleção de animes.'}</p><small>{listEntries.length} {listEntries.length === 1 ? 'anime' : 'animes'}{selectedList.is_ranked ? ' · ranqueada' : ''}</small></div>
+            </div>
+            {renderAnimeGrid(listEntries)}
+          </section>
+        ) : connectionsType ? (
+          <section className="social-connections-panel">
+            <div className="page-intro"><div><p className="eyebrow">COMUNIDADE KATARU</p><h1>{connectionsType === 'followers' ? 'Seguidores' : 'Seguindo'}</h1><p className="page-subtitle">Pessoas relacionadas a @{selectedProfile.username}.</p></div></div>
+            {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando pessoas...</div> : connections.length ? (
+              <div className="social-user-grid">
+                {connections.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} />)}
+              </div>
+            ) : <div className="social-empty"><Users size={23} /><strong>Ninguém por aqui ainda</strong></div>}
+          </section>
+        ) : (
+          <>
+            <section className="social-profile-hero">
+              <div className="social-profile-main">
+                <SocialAvatar profile={selectedProfile} size="large" />
+                <div className="social-profile-copy">
+                  <p className="eyebrow">{ownProfile ? 'MEU PERFIL' : 'PERFIL KATARU'}</p>
+                  <h1>{selectedProfile.display_name || selectedProfile.username}</h1>
+                  <span>@{selectedProfile.username}</span>
+                  {selectedProfile.bio && <p>{selectedProfile.bio}</p>}
+                  <small>Na comunidade desde {formatDate(selectedProfile.created_at)}</small>
+                </div>
+              </div>
+              <div className="social-profile-actions">
+                {ownProfile
+                  ? <button className="outline-button" onClick={() => setEditingProfile(value => !value)}><Pencil size={14} />{editingProfile ? 'Cancelar edição' : 'Editar perfil'}</button>
+                  : <button className={isFollowing ? 'outline-button social-following-button' : 'primary-button'} onClick={toggleFollow} disabled={busy}>
+                      {busy ? <LoaderCircle size={15} className="spin" /> : isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
+                      {busy ? 'Aguarde...' : isFollowing ? 'Seguindo' : 'Seguir'}
+                    </button>}
+              </div>
+              <div className="social-profile-stats">
+                <button onClick={() => showConnections('followers')}><strong>{profileStats.followers}</strong><span>Seguidores</span></button>
+                <button onClick={() => showConnections('following')}><strong>{profileStats.following}</strong><span>Seguindo</span></button>
+                <div><strong>{ownProfile || isFollowing ? profileAnime.length : '—'}</strong><span>Animes</span></div>
+              </div>
+            </section>
+            {editingProfile && ownProfile && (
+              <form className="social-profile-edit" onSubmit={saveProfile}>
+                <label>Nome de exibição<input maxLength={50} value={profileForm.display_name} onChange={event => setProfileForm(value => ({ ...value, display_name: event.target.value }))} placeholder="Como as pessoas verão você" /></label>
+                <label>Bio<textarea maxLength={160} rows={3} value={profileForm.bio} onChange={event => setProfileForm(value => ({ ...value, bio: event.target.value }))} placeholder="Conte um pouco sobre seus gostos de anime" /></label>
+                <div><small>{profileForm.bio.length}/160 caracteres</small><button className="primary-button" type="submit" disabled={savingProfile}>{savingProfile ? 'Salvando...' : 'Salvar perfil'}</button></div>
+              </form>
+            )}
+            {notice && <div className="social-notice">{notice}</div>}
+            {error && <div className="social-error">{error}</div>}
+            <div className="social-profile-tabs">
+              <button className={profileTab === 'library' ? 'active' : ''} onClick={() => { setProfileTab('library'); setSelectedList(null); }}><Library size={15} />Biblioteca</button>
+              <button className={profileTab === 'lists' ? 'active' : ''} onClick={() => { setProfileTab('lists'); setSelectedList(null); }}><List size={15} />Listas <span>{visible ? profileLists.length : '🔒'}</span></button>
+            </div>
+            {contentLoading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando biblioteca e listas...</div> : visible ? (
+              profileTab === 'library' ? renderAnimeGrid(profileAnime) : profileLists.length ? (
+                <div className="social-lists-grid">
+                  {profileLists.map(list => (
+                    <button className="social-list-card" key={list.id} onClick={() => setSelectedList(list)}>
+                      <span className="social-list-icon"><List size={22} /></span>
+                      <span><strong>{list.name}</strong><small>{list.description || 'Lista de animes'}</small><em>{list.anime_ids?.length || 0} títulos{list.is_ranked ? ' · ranqueada' : ''}</em></span>
+                      <ChevronRight size={17} />
+                    </button>
+                  ))}
+                </div>
+              ) : <div className="social-empty"><List size={23} /><strong>Nenhuma lista criada</strong><span>Este perfil ainda não criou listas.</span></div>
+            ) : (
+              <div className="social-private-state"><Users size={25} /><strong>Biblioteca e listas para seguidores</strong><p>Siga @{selectedProfile.username} para acompanhar seus animes e listas.</p><button className="primary-button" onClick={toggleFollow} disabled={busy}><UserPlus size={15} />Seguir para ver o perfil</button></div>
+            )}
+          </>
+        )}
+        {error && !connectionsType && <div className="social-error">{error}</div>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="community-page">
+      <PageIntro
+        eyebrow="COMUNIDADE KATARU"
+        title="Pessoas"
+        subtitle="Encontre outros fãs, siga perfis e acompanhe suas bibliotecas e listas."
+        action={<button className="outline-button" onClick={openMyProfile}><UserRound size={15} />Meu perfil</button>}
+      />
+      <div className="community-tabs">
+        <button className={tab === 'discover' ? 'active' : ''} onClick={() => setTab('discover')}><Search size={15} />Encontrar pessoas</button>
+        <button className={tab === 'following' ? 'active' : ''} onClick={() => setTab('following')}><Users size={15} />Seguindo <span>{followingProfiles.length}</span></button>
+      </div>
+      {tab === 'discover' ? (
+        <>
+          <label className="social-search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar por nome de usuário (ex.: pedro)" /><kbd>⌕</kbd></label>
+          <p className="social-search-note">Digite pelo menos 2 caracteres do @usuário para encontrar pessoas.</p>
+          {error && <div className="social-error">{error}</div>}
+          {loading ? <div className="loading-block"><LoaderCircle className="spin" />Buscando pessoas...</div> : query.trim().length >= 2 ? searchResults.length ? (
+            <div className="social-user-grid">
+              {searchResults.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} hint="Toque para ver o perfil" />)}
+            </div>
+          ) : <div className="social-empty"><Users size={23} /><strong>Nenhum usuário encontrado</strong><span>Confira a grafia do nome de usuário.</span></div> : (
+            <div className="social-discover-empty"><Users size={25} /><strong>Conheça outros fãs de anime</strong><p>Pesquise por um nome de usuário para abrir o perfil e começar a seguir.</p></div>
+          )}
+        </>
+      ) : (
+        followingProfiles.length ? (
+          <div className="social-user-grid">
+            {followingProfiles.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} hint="Você está seguindo este perfil" />)}
+          </div>
+        ) : <div className="social-empty"><Users size={23} /><strong>Você ainda não segue ninguém</strong><span>Encontre pessoas e acompanhe suas bibliotecas e listas.</span><button className="primary-button" onClick={() => setTab('discover')}>Encontrar pessoas</button></div>
+      )}
+    </div>
+  );
 }
 
 function ListsPage({ items, lists, counts, onOpenStatus, onOpenList, onNewList, onEditList }) {

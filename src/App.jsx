@@ -12,7 +12,7 @@ import {
   createAnimeList, deleteAnime, deleteAnimeList, getAnimeList, getAnimeLists,
   getCurrentKataruProfile, getFollowedKataruAnime, getFollowedKataruLists,
   getKataruProfile, getKataruRelationProfiles,
-  getKataruSocialStats, isFollowingKataruUser, searchKataruProfiles,
+  getKataruSocialStats, isFollowingKataruUser, isKataruUsernameAvailable, searchKataruProfiles,
   followKataruUser, unfollowKataruUser, updateKataruProfile, saveAnime, saveAnimeList, storageMode, supabase
 } from './storage';
 
@@ -282,6 +282,7 @@ function groupAnimeByFranchise(entries, sortMode = 'release', relationEntries = 
     });
 };
 const getInitials = value => String(value || 'K').trim().slice(0, 1).toUpperCase();
+const KATARU_USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
 export default function App() {
   const [items, setItems] = useState([]);
@@ -1897,7 +1898,8 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [editingProfile, setEditingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState({ display_name: '', bio: '' });
+  const [profileForm, setProfileForm] = useState({ username: '', display_name: '', bio: '' });
+  const [usernameAvailability, setUsernameAvailability] = useState('current');
   const [savingProfile, setSavingProfile] = useState(false);
   const [notice, setNotice] = useState('');
   const searchInputRef = useRef(null);
@@ -1999,9 +2001,11 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
         setContentLoading(false);
       }
       setProfileForm({
+        username: profile.username || '',
         display_name: profile.display_name || profile.username || '',
         bio: profile.bio || ''
       });
+      setUsernameAvailability('current');
     } catch (loadError) {
       setContentLoading(false);
       setError(loadError.message || 'Não foi possível carregar o perfil.');
@@ -2083,18 +2087,72 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
     }
   }
 
+  useEffect(() => {
+    if (!editingProfile || selectedProfile?.user_id !== currentUserId) {
+      setUsernameAvailability('current');
+      return undefined;
+    }
+    const candidate = String(profileForm.username || '').trim().toLowerCase();
+    const current = String(selectedProfile?.username || '').toLowerCase();
+    if (candidate === current) {
+      setUsernameAvailability('current');
+      return undefined;
+    }
+    if (!KATARU_USERNAME_PATTERN.test(candidate)) {
+      setUsernameAvailability('invalid');
+      return undefined;
+    }
+    let active = true;
+    setUsernameAvailability('checking');
+    const timer = window.setTimeout(async () => {
+      try {
+        const available = await isKataruUsernameAvailable(candidate);
+        if (active) setUsernameAvailability(available ? 'available' : 'taken');
+      } catch {
+        if (active) setUsernameAvailability('error');
+      }
+    }, 350);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [editingProfile, profileForm.username, selectedProfile?.username, selectedProfile?.user_id, currentUserId]);
+
   async function saveProfile(event) {
     event.preventDefault();
+    const nextUsername = String(profileForm.username || '').trim().toLowerCase();
+    const currentUsername = String(selectedProfile?.username || '').toLowerCase();
+    if (!KATARU_USERNAME_PATTERN.test(nextUsername)) {
+      setError('Use de 3 a 20 caracteres: letras, números ou _.');
+      return;
+    }
     setSavingProfile(true);
     setError('');
     try {
-      const updated = await updateKataruProfile(profileForm);
+      if (nextUsername !== currentUsername) {
+        const available = await isKataruUsernameAvailable(nextUsername);
+        if (!available) throw new Error('Esse nome de usuário já está em uso ou reservado. Escolha outro.');
+      }
+      const nextDisplayName = String(profileForm.display_name || '').trim();
+      const updated = await updateKataruProfile({
+        ...profileForm,
+        username: nextUsername,
+        // If the display name was only mirroring the old @, keep it in sync.
+        display_name: nextDisplayName === currentUsername ? nextUsername : nextDisplayName
+      });
       setSelectedProfile(updated);
-      setProfileForm({ display_name: updated.display_name || '', bio: updated.bio || '' });
+      setProfileForm({
+        username: updated.username || '',
+        display_name: updated.display_name || updated.username || '',
+        bio: updated.bio || ''
+      });
+      setUsernameAvailability('current');
       setEditingProfile(false);
       setNotice('Seu perfil foi atualizado.');
     } catch (saveError) {
-      setError(saveError.message || 'Não foi possível atualizar seu perfil.');
+      setError(saveError.code === '23505'
+        ? 'Esse nome de usuário acabou de ser escolhido. Tente outro.'
+        : saveError.message || 'Não foi possível atualizar seu perfil.');
     } finally {
       setSavingProfile(false);
     }
@@ -2215,9 +2273,18 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
                     </section>
                     {editingProfile && ownProfile && (
                       <form className="social-profile-edit" onSubmit={saveProfile}>
+                        <label>Nome de usuário
+                          <span className="social-username-edit-field"><span>@</span><input autoCapitalize="none" autoCorrect="off" spellCheck="false" maxLength={20} value={profileForm.username} onChange={event => setProfileForm(value => ({ ...value, username: event.target.value.toLowerCase() }))} placeholder="seu_usuario" /></span>
+                          <small>Seu @ público. Use de 3 a 20 caracteres: letras, números ou _.</small>
+                        </label>
+                        {usernameAvailability === 'checking' && <p className="social-username-feedback"><LoaderCircle size={12} className="spin" /> Verificando disponibilidade...</p>}
+                        {usernameAvailability === 'available' && <p className="social-username-feedback is-good"><Check size={12} /> @ disponível</p>}
+                        {usernameAvailability === 'taken' && <p className="social-username-feedback is-bad"><AlertCircle size={12} /> Esse @ já está em uso ou reservado.</p>}
+                        {usernameAvailability === 'invalid' && <p className="social-username-feedback is-bad"><AlertCircle size={12} /> Use de 3 a 20 caracteres: letras, números ou _.</p>}
+                        {usernameAvailability === 'error' && <p className="social-username-feedback is-bad"><AlertCircle size={12} /> Não foi possível verificar agora. Tente novamente.</p>}
                         <label>Nome de exibição<input maxLength={50} value={profileForm.display_name} onChange={event => setProfileForm(value => ({ ...value, display_name: event.target.value }))} placeholder="Como as pessoas verão você" /></label>
                         <label>Bio<textarea maxLength={160} rows={3} value={profileForm.bio} onChange={event => setProfileForm(value => ({ ...value, bio: event.target.value }))} placeholder="Conte um pouco sobre seus gostos de anime" /></label>
-                        <div><small>{profileForm.bio.length}/160 caracteres</small><button className="primary-button" type="submit" disabled={savingProfile}>{savingProfile ? 'Salvando...' : 'Salvar perfil'}</button></div>
+                        <div><small>{profileForm.bio.length}/160 caracteres</small><button className="primary-button" type="submit" disabled={savingProfile || !KATARU_USERNAME_PATTERN.test(String(profileForm.username || '').trim().toLowerCase()) || (String(profileForm.username || '').trim().toLowerCase() !== String(selectedProfile.username || '').toLowerCase() && usernameAvailability !== 'available')}>{savingProfile ? 'Salvando...' : 'Salvar perfil'}</button></div>
                       </form>
                     )}
                     {notice && <div className="social-notice">{notice}</div>}

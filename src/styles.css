@@ -1694,6 +1694,50 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 
 /* Comunidade: perfis, seguidores e bibliotecas compartilhadas */
+/* Busca social em janela sobreposta, sem trocar a página atual */
+.social-community-overlay {
+  z-index: 65;
+  padding: 20px;
+}
+.social-community-modal {
+  width: min(920px, 100%);
+  max-height: min(88vh, 820px);
+  padding: 22px;
+}
+.social-community-modal-header {
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.social-community-modal-header h2 {
+  margin: 0;
+  color: var(--text);
+  font: 700 21px/1.15 'Outfit', sans-serif;
+}
+.social-community-modal-header .eyebrow { margin-bottom: 4px; }
+.social-community-modal-header p:not(.eyebrow) {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.social-community-modal .community-page { min-width: 0; }
+.social-community-modal .social-profile-hero { margin-top: 2px; }
+.social-community-modal .social-anime-grid { grid-template-columns: repeat(5,minmax(0,1fr)); }
+.social-community-modal .social-user-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+@media (max-width: 680px) {
+  .social-community-overlay { align-items: center; padding: 10px; }
+  .social-community-modal {
+    width: 100%;
+    max-height: min(92dvh, 900px);
+    padding: 17px 14px max(17px,env(safe-area-inset-bottom));
+    border-radius: 15px;
+  }
+  .social-community-modal .social-anime-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px 9px; }
+  .social-community-modal .social-user-grid { grid-template-columns: 1fr; }
+}
+
 .community-page { min-width: 0; }
 .community-tabs, .social-profile-tabs { display: flex; align-items: center; gap: 8px; margin: 0 0 20px; border-bottom: 1px solid var(--line); }
 .community-tabs button, .social-profile-tabs button { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 0 8px; color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; font-size: 10px; font-weight: 650; white-space: nowrap; }

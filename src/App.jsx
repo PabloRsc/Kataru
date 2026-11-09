@@ -916,6 +916,10 @@ export default function App() {
       <footer className="footer">
         <img className="footer-wordmark" src={KATARU_WORDMARK} alt="Kataru" />
         <span>Seu universo de animes, em um só lugar.</span>
+        <nav className="footer-legal" aria-label="Informações legais">
+          <a href="/termos.html" target="_blank" rel="noopener noreferrer">Termos</a>
+          <a href="/privacidade.html" target="_blank" rel="noopener noreferrer">Privacidade</a>
+        </nav>
         <span className="storage-label">{storageMode === 'supabase' ? 'Sincronizado na nuvem' : 'Salvo neste navegador'}</span>
       </footer>
 

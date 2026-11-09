@@ -177,12 +177,24 @@ const normalizeFranchiseTitle = value => normalizeAnimeTitle(value)
   .replace(/\b(?:\d+(?:st|nd|rd|th)|second|third|fourth|fifth|final) season\b/g, ' ')
   .replace(/\bseason\s+(?:\d+|[ivx]+)\b/g, ' ')
   .replace(/\b(?:part|cour)\s+(?:\d+|one|two|three|four|[ivx]+)\b/g, ' ')
-  .replace(/\b(?:the )?final season\b/g, ' ')
+  .replace(/\b(?:the )?(?:final season|movie|film|ova|ona|special)\b/g, ' ')
   .replace(/\s+/g, ' ')
   .trim();
-const franchiseKeys = anime => getAnimeAliases(anime)
-  .map(normalizeFranchiseTitle)
-  .filter(key => key.split(' ').length >= 2 && key.length >= 8);
+
+// Um título-base antes de ":", travessões ou "/" ajuda a reconhecer franquias
+// cujos arcos têm subtítulos diferentes, como "Bleach: ...".
+const franchiseKeys = anime => {
+  const keys = new Set();
+  getAnimeAliases(anime).forEach(alias => {
+    const normalized = normalizeFranchiseTitle(alias);
+    if (normalized.length >= 4) keys.add(normalized);
+
+    const prefix = String(alias || '').split(/\s*(?::|[–—]|\s-\s|\/|\|)\s*/)[0];
+    const prefixKey = normalizeFranchiseTitle(prefix);
+    if (prefixKey.length >= 4) keys.add(prefixKey);
+  });
+  return [...keys];
+};
 
 const compareLibraryOrder = (a, b, sortMode = 'release') => {
   if (sortMode === 'title') return displayTitle(a).localeCompare(displayTitle(b), 'pt-BR');
@@ -198,8 +210,10 @@ const compareLibraryOrder = (a, b, sortMode = 'release') => {
   return compareReleaseDate(a, b);
 };
 
-function groupAnimeByFranchise(entries, sortMode = 'release') {
-  const parent = new Map((entries || []).map(anime => [String(anime.mal_id), String(anime.mal_id)]));
+function groupAnimeByFranchise(entries, sortMode = 'release', relationEntries = entries) {
+  const visibleEntries = entries || [];
+  const catalogEntries = relationEntries || visibleEntries;
+  const parent = new Map(catalogEntries.map(anime => [String(anime.mal_id), String(anime.mal_id)]));
   const find = id => {
     const current = parent.get(id);
     if (!current) return null;
@@ -215,7 +229,7 @@ function groupAnimeByFranchise(entries, sortMode = 'release') {
   };
 
   const byFranchiseKey = new Map();
-  (entries || []).forEach(anime => {
+  catalogEntries.forEach(anime => {
     const id = String(anime.mal_id);
     (anime.related_anime || []).forEach(relation => {
       const relatedId = String(relation.mal_id || '');
@@ -227,24 +241,38 @@ function groupAnimeByFranchise(entries, sortMode = 'release') {
     });
   });
 
-  const groups = new Map();
-  (entries || []).forEach(anime => {
+  const fullGroups = new Map();
+  catalogEntries.forEach(anime => {
     const key = find(String(anime.mal_id)) || String(anime.mal_id);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(anime);
+    if (!fullGroups.has(key)) fullGroups.set(key, []);
+    fullGroups.get(key).push(anime);
   });
 
-  return [...groups.values()]
-    .map(group => {
+  const visibleGroups = new Map();
+  visibleEntries.forEach(anime => {
+    const key = find(String(anime.mal_id)) || String(anime.mal_id);
+    if (!visibleGroups.has(key)) visibleGroups.set(key, []);
+    visibleGroups.get(key).push(anime);
+  });
+
+  return [...visibleGroups.entries()]
+    .map(([key, group]) => {
       const ordered = [...group].sort(compareReleaseDate);
-      const tvEntry = ordered.find(anime => String(anime.format || '').toUpperCase() === 'TV');
+      const franchiseItems = fullGroups.get(key) || group;
+      const chronologicalCatalog = [...franchiseItems].sort(compareReleaseDate);
+      const tvEntry = chronologicalCatalog.find(anime => String(anime.format || '').toUpperCase() === 'TV');
       return {
-        key: String(ordered[0]?.mal_id || ''),
-        title: displayTitle(tvEntry || ordered[0]),
-        items: ordered
+        key: String(ordered[0]?.mal_id || key),
+        title: displayTitle(tvEntry || chronologicalCatalog[0] || ordered[0]),
+        items: ordered,
+        isFranchise: franchiseItems.length > 1
       };
     })
-    .sort((a, b) => compareLibraryOrder(a.items[0], b.items[0], sortMode));
+    .sort((a, b) => {
+      const left = sortMode === 'release-desc' ? a.items[a.items.length - 1] : a.items[0];
+      const right = sortMode === 'release-desc' ? b.items[b.items.length - 1] : b.items[0];
+      return compareLibraryOrder(left, right, sortMode);
+    });
 };
 const getInitials = value => String(value || 'K').trim().slice(0, 1).toUpperCase();
 
@@ -1338,6 +1366,7 @@ function PosterCard({ anime, onClick, compact = false }) {
       <div className="poster-art">
         {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <div className="poster-fallback"><Clapperboard size={25} /></div>}
         <span className={'status-pill tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
+        {anime.format && <span className="poster-format-pill">{localizedFormat(anime.format)}</span>}
         {anime.status !== 'watching' && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
         {anime.status === 'watching' && <>
           <span className={total ? 'poster-progress' : 'poster-progress is-indeterminate'}><i style={{ width: (total ? progress : 34) + '%' }} /></span>
@@ -1345,7 +1374,7 @@ function PosterCard({ anime, onClick, compact = false }) {
         </>}
       </div>
       <span className="poster-name">{displayTitle(anime)}</span>
-      <span className="poster-meta">{formatReleaseLabel(anime)}{anime.format ? ' · ' + localizedFormat(anime.format) : ''}</span>
+      <span className="poster-meta">{formatReleaseLabel(anime)}</span>
     </button>
   );
 }
@@ -1359,12 +1388,12 @@ function LibraryPage({
   const genres = Array.from(new Set(allItems.flatMap(anime => anime.genres || []))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const years = Array.from(new Set(allItems.map(anime => anime.year).filter(Boolean))).sort((a, b) => b - a);
   const filtersActive = Boolean(genreFilter || yearFilter || formatFilter || ratingFilter);
-  const orderedGroups = groupAnimeByFranchise(items, sort);
+  const orderedGroups = groupAnimeByFranchise(items, sort, allItems);
   const standaloneItems = orderedGroups
-    .filter(group => group.items.length === 1)
+    .filter(group => !group.isFranchise)
     .map(group => group.items[0])
     .sort((a, b) => compareLibraryOrder(a, b, sort));
-  const firstStandaloneKey = orderedGroups.find(group => group.items.length === 1)?.key || null;
+  const firstStandaloneKey = orderedGroups.find(group => !group.isFranchise)?.key || null;
   function clearFilters() { setGenreFilter(''); setYearFilter(''); setFormatFilter(''); setRatingFilter(''); }
 
   return (
@@ -1410,7 +1439,7 @@ function LibraryPage({
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando sua biblioteca...</div> : items.length ? (
         <div className="library-groups">
           {orderedGroups.map(group => {
-            if (group.items.length === 1) {
+            if (!group.isFranchise) {
               if (group.key !== firstStandaloneKey) return null;
               return (
                 <section className="library-franchise-single" key="library-standalone">
@@ -1423,7 +1452,7 @@ function LibraryPage({
             return (
               <section className="library-franchise" key={group.key}>
                 <div className="library-franchise-heading">
-                  <div><h2>{group.title}</h2><p>Temporadas e conteúdos relacionados</p></div>
+                  <div><h2>{group.title}</h2><p>Séries, filmes e especiais em ordem de lançamento</p></div>
                   <span>{group.items.length} títulos · {formatReleaseLabel(group.items[0])} – {formatReleaseLabel(group.items[group.items.length - 1])}</span>
                 </div>
                 {gridMode === 'grid'

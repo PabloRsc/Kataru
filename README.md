@@ -39,12 +39,13 @@ Sem variáveis Supabase, o app permanece em modo local para desenvolvimento. Os 
 4. Execute **supabase/social-follows-migration.sql** para habilitar descoberta de perfis, seguidores e projeções seguras de bibliotecas/listas compartilhadas.
 5. Em instalações que já receberam a migração social anterior, execute **supabase/social-follows-privacy-hardening.sql** para restringir a projeção aos campos não pessoais.
 6. Em contas/perfis sociais já existentes, execute **supabase/profile-identity-migration.sql** para alinhar a data pública à data original da conta e normalizar nomes genéricos de perfis antigos.
-7. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
-8. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
-9. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
-10. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
+7. Execute **supabase/profile-avatar-storage-migration.sql** para criar o bucket público de fotos de perfil e as políticas de upload/exclusão por usuário.
+8. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
+9. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
+10. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
+11. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
 
-A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha, opção Google, confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. O nome de usuário público também pode ser alterado depois, em Meu perfil → Editar perfil; o e-mail de login não é alterado. Com Supabase configurado, a coleção exige sessão autenticada.
+A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha, opção Google, confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. O nome de usuário público também pode ser alterado depois, em Meu perfil → Editar perfil; o e-mail de login não é alterado. A mesma tela permite adicionar, trocar ou remover uma foto de perfil (JPG, PNG ou WEBP, até 2 MB). Com Supabase configurado, a coleção exige sessão autenticada.
 
 **Google OAuth:** o código já inicia o fluxo, mas é necessário habilitar Google em Authentication → Providers, inserir o OAuth Client ID/Secret do Google Cloud e cadastrar o callback do Supabase no Google Cloud. A URL de retorno do site também deve estar na lista de Redirect URLs do Supabase.
 

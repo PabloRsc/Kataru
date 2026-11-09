@@ -141,7 +141,7 @@ export async function updateKataruProfile(profile) {
     username,
     display_name: String(profile.display_name || '').trim().slice(0, 50) || null,
     bio: String(profile.bio || '').trim().slice(0, 160),
-    updated_at: new Date().toISOString()
+    avatar_url: profile.avatar_url ?? null
   };
   const { data, error } = await supabase.from('kataru_profiles')
     .update(payload)
@@ -150,6 +150,51 @@ export async function updateKataruProfile(profile) {
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function uploadKataruAvatar(file) {
+  const user = await requireUser();
+  if (!file) throw new Error('Escolha uma imagem para enviar.');
+  const allowedTypes = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp'
+  };
+  const extension = allowedTypes[file.type];
+  if (!extension) throw new Error('Use uma imagem JPG, PNG ou WEBP.');
+  if (file.size > 2 * 1024 * 1024) throw new Error('A imagem precisa ter no máximo 2 MB.');
+
+  const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
+  const { data, error } = await supabase.storage.from('avatars').upload(path, file, {
+    cacheControl: '3600',
+    contentType: file.type,
+    upsert: false
+  });
+  if (error) {
+    if (error.message?.toLowerCase().includes('bucket not found')) {
+      throw new Error('O armazenamento de fotos ainda não está configurado. Atualize as políticas de avatar no Supabase.');
+    }
+    throw error;
+  }
+  const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(data.path);
+  return { path: data.path, publicUrl: publicData.publicUrl };
+}
+
+export async function removeKataruAvatar(path) {
+  const user = await requireUser();
+  const safePath = String(path || '');
+  if (!safePath.startsWith(`${user.id}/`)) return false;
+  const { error } = await supabase.storage.from('avatars').remove([safePath]);
+  if (error) throw error;
+  return true;
+}
+
+export function getKataruAvatarPath(publicUrl) {
+  const marker = '/storage/v1/object/public/avatars/';
+  const value = String(publicUrl || '');
+  const position = value.indexOf(marker);
+  if (position < 0) return null;
+  return decodeURIComponent(value.slice(position + marker.length).split('?')[0]);
 }
 
 export async function getKataruProfile(userId) {

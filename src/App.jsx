@@ -40,6 +40,7 @@ const DISCOVER_TABS = [
 ];
 
 const SORT_OPTIONS = [
+  { id: 'franchise', label: 'Franquia (A–Z)' },
   { id: 'release', label: 'Lançamento (mais antigo)' },
   { id: 'release-desc', label: 'Lançamento (mais recente)' },
   { id: 'updated', label: 'Atualizado recentemente' },
@@ -269,6 +270,9 @@ function groupAnimeByFranchise(entries, sortMode = 'release', relationEntries = 
       };
     })
     .sort((a, b) => {
+      if (sortMode === 'franchise' || sortMode === 'title') {
+        return a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' });
+      }
       const left = sortMode === 'release-desc' ? a.items[a.items.length - 1] : a.items[0];
       const right = sortMode === 'release-desc' ? b.items[b.items.length - 1] : b.items[0];
       return compareLibraryOrder(left, right, sortMode);
@@ -284,7 +288,7 @@ export default function App() {
   const [activeList, setActiveList] = useState(null);
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState('release');
+  const [sort, setSort] = useState('franchise');
   const [genreFilter, setGenreFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [formatFilter, setFormatFilter] = useState('');
@@ -1388,12 +1392,8 @@ function LibraryPage({
   const genres = Array.from(new Set(allItems.flatMap(anime => anime.genres || []))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const years = Array.from(new Set(allItems.map(anime => anime.year).filter(Boolean))).sort((a, b) => b - a);
   const filtersActive = Boolean(genreFilter || yearFilter || formatFilter || ratingFilter);
-  const orderedGroups = groupAnimeByFranchise(items, sort, allItems);
-  const standaloneItems = orderedGroups
-    .filter(group => !group.isFranchise)
-    .map(group => group.items[0])
-    .sort((a, b) => compareLibraryOrder(a, b, sort));
-  const firstStandaloneKey = orderedGroups.find(group => !group.isFranchise)?.key || null;
+  const orderedItems = groupAnimeByFranchise(items, sort, allItems)
+    .flatMap(group => group.items);
   function clearFilters() { setGenreFilter(''); setYearFilter(''); setFormatFilter(''); setRatingFilter(''); }
 
   return (
@@ -1401,7 +1401,7 @@ function LibraryPage({
       <PageIntro
         eyebrow="SUA COLEÇÃO PESSOAL"
         title="Biblioteca"
-        subtitle="Separada por formato e organizada pelo lançamento; temporadas relacionadas aparecem juntas."
+        subtitle="Uma única biblioteca, organizada por franquia em ordem alfabética e por lançamento dentro de cada franquia."
         action={<div className="library-view-actions">
           <button className="outline-button library-sync-button" onClick={onSyncMetadata} disabled={syncBusy || !allItems.some(anime => !anime.is_manual)}>
             {syncBusy ? `Atualizando ${syncProgress?.current || 0}/${syncProgress?.total || 0}...` : 'Atualizar datas e temporadas'}
@@ -1437,31 +1437,15 @@ function LibraryPage({
       </div>}
       <div className="results-summary"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{filter === 'all' ? 'Todos os status' : statusLabel(filter)}</span></div>
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando sua biblioteca...</div> : items.length ? (
-        <div className="library-groups">
-          {orderedGroups.map(group => {
-            if (!group.isFranchise) {
-              if (group.key !== firstStandaloneKey) return null;
-              return (
-                <section className="library-franchise-single" key="library-standalone">
-                  {gridMode === 'grid'
-                    ? <div className="library-grid">{standaloneItems.map(anime => <PosterCard key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>
-                    : <div className="library-list">{standaloneItems.map(anime => <AnimeRow key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>}
-                </section>
-              );
-            }
-            return (
-              <section className="library-franchise" key={group.key}>
-                <div className="library-franchise-heading">
-                  <div><h2>{group.title}</h2><p>Séries, filmes e especiais em ordem de lançamento</p></div>
-                  <span>{group.items.length} títulos · {formatReleaseLabel(group.items[0])} – {formatReleaseLabel(group.items[group.items.length - 1])}</span>
-                </div>
-                {gridMode === 'grid'
-                  ? <div className="library-grid">{group.items.map(anime => <PosterCard key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>
-                  : <div className="library-list">{group.items.map(anime => <AnimeRow key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>}
-              </section>
-            );
-          })}
-        </div>
+        gridMode === 'grid' ? (
+          <div className="library-grid">
+            {orderedItems.map(anime => <PosterCard key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}
+          </div>
+        ) : (
+          <div className="library-list">
+            {orderedItems.map(anime => <AnimeRow key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}
+          </div>
+        )
       ) : (
         <div className="empty-state">
           <div className="empty-state-icon"><Library size={25} /></div>

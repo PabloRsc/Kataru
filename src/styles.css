@@ -162,6 +162,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .empty-actions { display: flex; align-items: center; gap: 8px; }
 
 .footer { display: flex; align-items: center; gap: 18px; padding: 22px max(4.5vw, 28px); color: var(--muted-2); background: #0C0E13; border-top: 1px solid var(--line-soft); font-size: 9px; }
+.footer-legal { display: flex; align-items: center; gap: 12px; }
+.footer-legal a { color: var(--muted-2); text-decoration: none; transition: color .18s ease; }
+.footer-legal a:hover { color: var(--text); }
 .footer-brand { color: #CDD0DA; font: 800 14px 'Outfit', sans-serif; letter-spacing: 1.4px; }
 .storage-label { margin-left: auto; }
 .mobile-nav { display: none; }

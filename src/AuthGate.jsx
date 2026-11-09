@@ -668,7 +668,7 @@ export default function AuthGate({ children }) {
 
             {notice && isAuthForm && mode !== 'login' && mode !== 'signup' && <AuthFeedback tone="success">{notice}</AuthFeedback>}
           </div>
-          <div className="auth-right-footer"><span>Protegido e sincronizado com segurança.</span><span>© Kataru</span></div>
+          <div className="auth-right-footer"><span>Protegido e sincronizado com segurança.</span><span className="auth-legal-footer-links"><a href="/termos.html" target="_blank" rel="noopener noreferrer">Termos</a><a href="/privacidade.html" target="_blank" rel="noopener noreferrer">Privacidade</a></span><span>© Kataru</span></div>
         </section>
       </div>
       {notice && mode === 'login' && <div className="auth-toast"><CheckCircle2 size={16} />{notice}<button type="button" onClick={() => setNotice('')} aria-label="Fechar"><X size={14} /></button></div>}

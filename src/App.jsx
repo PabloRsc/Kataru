@@ -161,8 +161,7 @@ const formatReleaseLabel = anime => {
       return date.toLocaleDateString('pt-BR', {
         day: '2-digit',
         month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC'
+        year: 'numeric'
       });
     }
   }
@@ -1531,7 +1530,7 @@ function DiscoverPage({ tab, setTab, results, recommendations: recommendationSou
                     <span className="feature-tag"><Sparkles size={12} /> {featureLabel}</span>
                     <h2>{displayTitle(feature)}</h2>
                     <div className="feature-meta">
-                      <span>{feature.year || 'Ano não informado'}</span>
+                      <span>{formatReleaseLabel(feature)}</span>
                       {feature.format && <><i>·</i><span>{localizedFormat(feature.format)}</span></>}
                       {feature.score_external && <><i>·</i><span><Star size={12} fill="currentColor" />{Number(feature.score_external).toFixed(1).replace('.', ',')}</span></>}
                     </div>
@@ -1618,7 +1617,7 @@ function DiscoverShelf({ title, subtitle, items, findInCollection, lists, hasMor
                     {anime.score_external && <span className="poster-rating"><Star size={10} fill="currentColor" />{Number(anime.score_external).toFixed(1).replace('.', ',')}</span>}
                   </div>
                   <span className="poster-name">{displayTitle(anime)}</span>
-                  <span className="poster-meta">{anime.year || 'Ano não informado'}{anime.format ? ' · ' + localizedFormat(anime.format) : ''}</span>
+                  <span className="poster-meta">{formatReleaseLabel(anime)}{anime.format ? ' · ' + localizedFormat(anime.format) : ''}</span>
                 </button>
                 {reasonFor && <span className="discover-reason">{reasonFor(anime)}</span>}
                 {existing ? (

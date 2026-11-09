@@ -5,6 +5,7 @@
 begin;
 
 alter table public.anime_collection
+  add column if not exists episode_unknown boolean not null default false,
   add column if not exists display_title text,
   add column if not exists title_aliases text[] not null default '{}',
   add column if not exists episodes_total_manual integer,

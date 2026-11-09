@@ -1174,7 +1174,6 @@ export default function App() {
         <button className="mobile-nav-add" onClick={() => setSearchOpen(true)}><Plus size={21} /></button>
         <button className={page === 'discover' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('discover')}><Compass size={19} /><span>Descobrir</span></button>
         <button className={page === 'lists' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('lists')}><List size={19} /><span>Listas</span></button>
-        <button className={page === 'community' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => { setCommunitySearchRequest(value => value + 1); navigate('community'); }}><Search size={19} /><span>Pesquisar</span></button>
       </nav>
 
       {searchOpen && (
@@ -1858,6 +1857,13 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
   useEffect(() => {
     if (focusSearchSignal > 0) {
       acknowledgeSearchRequest?.(0);
+      setSelectedProfile(null);
+      setSelectedList(null);
+      setConnectionsType(null);
+      setConnections([]);
+      setQuery('');
+      setError('');
+      setNotice('');
       searchInputRef.current?.focus();
     }
   }, [focusSearchSignal, acknowledgeSearchRequest]);
@@ -2062,7 +2068,7 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
     return (
       <div className="community-page">
         <button className="back-link" onClick={selectedList ? () => setSelectedList(null) : connectionsType ? () => setConnectionsType(null) : returnToUserSearch}>
-          <ChevronLeft size={16} />{selectedList ? 'Voltar às listas' : connectionsType ? 'Voltar ao perfil' : 'Voltar para pessoas'}
+          <ChevronLeft size={16} />{selectedList ? 'Voltar às listas' : connectionsType ? 'Voltar ao perfil' : 'Voltar à busca de usuários'}
         </button>
         {selectedList ? (
           <section className="social-list-detail">

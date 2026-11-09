@@ -1669,3 +1669,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .detail-side { grid-template-columns: 78px minmax(0,1fr); }
   .detail-side-actions .primary-button { padding-inline: 5px; }
 }
+
+
+.library-view-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.library-sync-button { min-height: 34px; padding-inline: 10px; font-size: 9px; white-space: nowrap; }
+.library-sync-button:disabled { opacity: .58; }
+.library-sync-status { display: flex; flex-direction: column; gap: 7px; margin: -3px 0 14px; color: var(--muted); font-size: 9px; }
+.library-sync-status i { display: block; height: 4px; overflow: hidden; background: #303446; border-radius: 8px; }
+.library-sync-status b { display: block; height: 100%; background: var(--purple); transition: width .2s ease; }
+@media (max-width: 780px) {
+  .library-view-actions { width: 100%; justify-content: flex-end; }
+}
+@media (max-width: 600px) {
+  .library-view-actions { align-items: stretch; justify-content: space-between; gap: 7px; }
+  .library-sync-button { min-width: 0; flex: 1; min-height: 34px; padding-inline: 6px; font-size: 8px; white-space: normal; }
+  .library-view-actions .view-toggle { flex: 0 0 auto; }
+}
+@media (max-width: 360px) {
+  .library-view-actions { flex-direction: column; }
+  .library-view-actions .view-toggle { align-self: flex-end; }
+  .library-sync-button { width: 100%; }
+}

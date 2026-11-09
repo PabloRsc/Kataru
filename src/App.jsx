@@ -1869,7 +1869,7 @@ function AvatarCropModal({ file, onCancel, onConfirm }) {
   const [sourceUrl, setSourceUrl] = useState('');
   const [dimensions, setDimensions] = useState(null);
   const [viewportSize, setViewportSize] = useState(320);
-  const MIN_CROP_ZOOM = 1.15;
+  const MIN_CROP_ZOOM = 1.25;
   const [zoom, setZoom] = useState(MIN_CROP_ZOOM);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -2019,6 +2019,17 @@ function AvatarCropModal({ file, onCancel, onConfirm }) {
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
+            onLostPointerCapture={onPointerUp}
+            tabIndex={0}
+            onKeyDown={event => {
+              if (!dimensions || processing) return;
+              const step = event.shiftKey ? 12 : 4;
+              if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)) event.preventDefault();
+              if (event.key === 'ArrowUp') setOffset(current => clampOffset({ ...current, y: current.y - step }));
+              if (event.key === 'ArrowDown') setOffset(current => clampOffset({ ...current, y: current.y + step }));
+              if (event.key === 'ArrowLeft') setOffset(current => clampOffset({ ...current, x: current.x - step }));
+              if (event.key === 'ArrowRight') setOffset(current => clampOffset({ ...current, x: current.x + step }));
+            }}
           >
             {sourceUrl && (
               <img

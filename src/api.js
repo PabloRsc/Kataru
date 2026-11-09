@@ -91,6 +91,18 @@ export function normalizeAnime(a = {}) {
     ...titleSynonyms,
     ...listedTitles
   ].map(value => String(value || '').trim()).filter(Boolean))];
+  const relationGroups = Array.isArray(a.relations) ? a.relations : [];
+  const relatedAnime = Array.isArray(a.related_anime)
+    ? a.related_anime
+    : relationGroups.flatMap(group => (group.entry || []).map(entry => ({
+      mal_id: Number(entry.mal_id) || null,
+      title: entry.name || '',
+      relation: group.relation || '',
+      format: entry.format || '',
+      release_date: entry.release_date || null
+    })));
+  const airedFrom = a.aired?.from?.date || null;
+  const airedTo = a.aired?.to?.date || null;
   return {
     mal_id: a.mal_id,
     title,
@@ -102,6 +114,9 @@ export function normalizeAnime(a = {}) {
     episodes_total: a.episodes ?? null,
     episodes_available: a.episodes_available ?? null,
     airing_status: a.status || null,
+    release_date: airedFrom || (a.aired?.prop?.from?.year ? String(a.aired.prop.from.year) + '-01-01' : a.startDate || null),
+    end_date: airedTo || (a.aired?.prop?.to?.year ? String(a.aired.prop.to.year) + '-12-31' : a.endDate || null),
+    related_anime: relatedAnime.filter(entry => Number.isSafeInteger(Number(entry.mal_id)) && Number(entry.mal_id) > 0),
     year: a.year || a.aired?.prop?.from?.year || a.year_season || null,
     season: a.season || null,
     genres: (a.genres || []).map(g => typeof g === 'string' ? g : g.name).filter(Boolean),

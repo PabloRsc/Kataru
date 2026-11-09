@@ -258,6 +258,8 @@ export default function App() {
   const [toastActionBusy, setToastActionBusy] = useState(false);
   const toastTimerRef = useRef(null);
   const [loading, setLoading] = useState(true);
+  const [librarySyncBusy, setLibrarySyncBusy] = useState(false);
+  const [librarySyncProgress, setLibrarySyncProgress] = useState(null);
   const [discoverTab, setDiscoverTab] = useState('season');
   const [discoverResults, setDiscoverResults] = useState([]);
   const [discoverRecommendations, setDiscoverRecommendations] = useState([]);
@@ -774,6 +776,63 @@ export default function App() {
     }
   }
 
+  async function syncLibraryMetadata() {
+    const targets = items.filter(anime => !anime.is_manual);
+    if (!targets.length || librarySyncBusy) return;
+    setLibrarySyncBusy(true);
+    setLibrarySyncProgress({ current: 0, total: targets.length, title: '' });
+    let updated = 0;
+    let failed = 0;
+
+    try {
+      for (let index = 0; index < targets.length; index += 1) {
+        const anime = targets[index];
+        setLibrarySyncProgress({ current: index, total: targets.length, title: displayTitle(anime) });
+        try {
+          const fresh = await fetchAnime(anime.mal_id);
+          const merged = {
+            ...anime,
+            ...fresh,
+            id: anime.id,
+            status: anime.status,
+            episode_current: anime.episode_current,
+            rating_personal: anime.rating_personal,
+            notes: anime.notes,
+            display_title: anime.display_title,
+            episodes_total_manual: anime.episodes_total_manual,
+            episodes_available: fresh.episodes_available ?? anime.episodes_available ?? null,
+            rewatch_count: anime.rewatch_count,
+            started_at: anime.started_at,
+            completed_at: anime.completed_at,
+            api_synced_at: fresh.api_synced_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          await saveAnime(merged);
+          updated += 1;
+          setItems(current => current.map(item => String(item.mal_id) === String(anime.mal_id) ? merged : item));
+          setSelected(current => current && String(current.mal_id) === String(anime.mal_id) ? merged : current);
+        } catch {
+          failed += 1;
+        }
+        setLibrarySyncProgress({ current: index + 1, total: targets.length, title: displayTitle(anime) });
+        if (index < targets.length - 1) {
+          await new Promise(resolve => window.setTimeout(resolve, 380));
+        }
+      }
+      try {
+        setItems(await getAnimeList());
+      } catch {
+        // Keep the records already saved individually.
+      }
+      notify(failed
+        ? `Atualização concluída: ${updated} títulos atualizados e ${failed} sem resposta do catálogo.`
+        : `Datas e relações atualizadas em ${updated} títulos.`);
+    } finally {
+      setLibrarySyncBusy(false);
+      setLibrarySyncProgress(null);
+    }
+  }
+
   async function saveCustomList(event) {
     event.preventDefault();
     if (!listForm.name.trim()) return;
@@ -993,6 +1052,9 @@ export default function App() {
             setRatingFilter={setRatingFilter}
             onOpenAnime={setSelected}
             onAdd={() => setSearchOpen(true)}
+            onSyncMetadata={syncLibraryMetadata}
+            syncBusy={librarySyncBusy}
+            syncProgress={librarySyncProgress}
           />
         ) : page === 'discover' ? (
           <DiscoverPage
@@ -1271,7 +1333,8 @@ function PosterCard({ anime, onClick, compact = false }) {
 function LibraryPage({
   items, allItems, loading, counts, filter, setFilter, query, setQuery, sort, setSort,
   gridMode, setGridMode, genreFilter, setGenreFilter, yearFilter, setYearFilter,
-  formatFilter, setFormatFilter, ratingFilter, setRatingFilter, onOpenAnime, onAdd
+  formatFilter, setFormatFilter, ratingFilter, setRatingFilter, onOpenAnime, onAdd,
+  onSyncMetadata, syncBusy, syncProgress
 }) {
   const genres = Array.from(new Set(allItems.flatMap(anime => anime.genres || []))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const years = Array.from(new Set(allItems.map(anime => anime.year).filter(Boolean))).sort((a, b) => b - a);
@@ -1284,7 +1347,12 @@ function LibraryPage({
         eyebrow="SUA COLEÇÃO PESSOAL"
         title="Biblioteca"
         subtitle="Tudo o que você acompanha, em um só lugar."
-        action={<div className="view-toggle"><button className={gridMode === 'grid' ? 'selected' : ''} onClick={() => setGridMode('grid')} aria-label="Visualização em grade"><Grid2X2 size={16} />Grade</button><button className={gridMode === 'list' ? 'selected' : ''} onClick={() => setGridMode('list')} aria-label="Visualização em lista"><List size={16} />Lista</button></div>}
+        action={<div className="library-view-actions">
+          <button className="outline-button library-sync-button" onClick={onSyncMetadata} disabled={syncBusy || !allItems.some(anime => !anime.is_manual)}>
+            {syncBusy ? `Atualizando ${syncProgress?.current || 0}/${syncProgress?.total || 0}...` : 'Atualizar datas e temporadas'}
+          </button>
+          <div className="view-toggle"><button className={gridMode === 'grid' ? 'selected' : ''} onClick={() => setGridMode('grid')} aria-label="Visualização em grade"><Grid2X2 size={16} />Grade</button><button className={gridMode === 'list' ? 'selected' : ''} onClick={() => setGridMode('list')} aria-label="Visualização em lista"><List size={16} />Lista</button></div>
+        </div>}
       />
       <div className="status-tabs">
         <button className={filter === 'all' ? 'status-tab active' : 'status-tab'} onClick={() => setFilter('all')}>Todos <span>{counts.all}</span></button>
@@ -1308,6 +1376,10 @@ function LibraryPage({
         </div>
       </div>
       {filtersActive && <div className="active-filters"><span>Filtros ativos:</span>{genreFilter && <button className="filter-chip" onClick={() => setGenreFilter('')}>{genreFilter}<X size={12} /></button>}{yearFilter && <button className="filter-chip" onClick={() => setYearFilter('')}>{yearFilter}<X size={12} /></button>}{formatFilter && <button className="filter-chip" onClick={() => setFormatFilter('')}>{FORMAT_FILTERS.find(category => category.id === formatFilter)?.label || localizedFormat(formatFilter)}<X size={12} /></button>}{ratingFilter && <button className="filter-chip" onClick={() => setRatingFilter('')}>{ratingFilter}+<X size={12} /></button>}<button className="clear-filters" onClick={clearFilters}>Limpar tudo</button></div>}
+      {syncBusy && syncProgress && <div className="library-sync-status" role="status">
+        <span>Consultando catálogo: {syncProgress.current} de {syncProgress.total}{syncProgress.title ? ' · ' + syncProgress.title : ''}</span>
+        <i><b style={{ width: (syncProgress.total ? syncProgress.current / syncProgress.total * 100 : 0) + '%' }} /></i>
+      </div>}
       <div className="results-summary"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{filter === 'all' ? 'Todos os status' : statusLabel(filter)}</span></div>
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando sua biblioteca...</div> : items.length ? (
         <div className="library-groups">

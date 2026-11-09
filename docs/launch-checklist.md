@@ -53,6 +53,25 @@ A senha SMTP é um segredo: inserir diretamente no painel do Supabase, nunca no 
 
 ## Domínio próprio e acesso público
 
+### Opções de domínio consultadas em 9 de novembro de 2026
+
+A busca de disponibilidade e preços no registrador da Vercel encontrou:
+
+| Domínio | Disponibilidade | Registro (1 ano) | Renovação anual indicada |
+|---|---:|---:|---:|
+| `meukataru.com` | Disponível | US$ 12,03 | US$ 12,03 |
+| `kataruanime.com` | Disponível | US$ 12,03 | US$ 12,03 |
+| `kataru.one` | Disponível | US$ 7,99 | US$ 21,07 |
+| `kataru.page` | Disponível | US$ 11,99 | US$ 11,99 |
+| `kataru.watch` | Disponível | US$ 4,99 | US$ 41,00 |
+| `kataru.com` | Não disponível | — | — |
+| `kataru.app` | Não disponível | — | — |
+| `kataru.com.br` | Não disponível | — | — |
+
+**Recomendação inicial:** `meukataru.com`, por combinar o nome da marca com um .com familiar no Brasil, sem restringir a marca a conteúdo de anime. A decisão final aguarda aprovação do responsável pelo projeto. Os valores são em USD e podem receber impostos/taxas no pagamento; disponibilidade e preços podem mudar até o registro.
+
+Nenhuma compra ou reserva foi efetuada. A cotação lida na Vercel é não recorrente, com renovação automática desativada e registro não reembolsável. Antes de qualquer compra, conferir o cartão padrão da equipe e o total final na página de cobrança.
+
 **Inspeção administrativa realizada em 9 de novembro de 2026, após aprovação do acesso da equipe Vercel:**
 
 - O projeto Vercel `kataru` está com SSO Protection ativada.

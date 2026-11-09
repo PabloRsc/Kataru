@@ -2067,3 +2067,66 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .social-username-feedback.is-good { color: #75D8A5; }
 .social-username-feedback.is-bad { color: #FF929B; }
+
+
+.social-avatar-editor {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 13px 14px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.social-avatar-editor .social-avatar-large {
+  width: 66px;
+  height: 66px;
+  font-size: 21px;
+}
+.social-avatar-editor-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+.social-avatar-editor-copy > strong {
+  color: var(--text);
+  font: 700 11px 'Outfit',sans-serif;
+}
+.social-avatar-editor-copy > small {
+  color: var(--muted-2);
+  font-size: 8px;
+}
+.social-avatar-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+.social-avatar-editor-actions .outline-button {
+  min-height: 30px;
+  padding: 0 9px;
+  font-size: 9px;
+}
+.social-avatar-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 8px;
+  color: #F29AA1;
+  background: transparent;
+  border: 1px solid #803E4A70;
+  border-radius: 7px;
+  font-size: 9px;
+  cursor: pointer;
+}
+.social-avatar-remove:hover { background: #8D39431A; }
+.social-avatar-file-input { display: none !important; }
+@media (max-width: 520px) {
+  .social-avatar-editor { align-items: flex-start; gap: 11px; padding: 11px; }
+  .social-avatar-editor .social-avatar-large { width: 58px; height: 58px; }
+  .social-avatar-editor-actions { flex-wrap: wrap; }
+}

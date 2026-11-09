@@ -612,6 +612,34 @@ export default function App() {
     setSelected(null);
   }
 
+  function startAddFromSharedAnime(sharedAnime) {
+    const catalogEntry = {
+      id: String(sharedAnime.mal_id),
+      mal_id: Number(sharedAnime.mal_id),
+      title: sharedAnime.title,
+      title_english: sharedAnime.title_english,
+      title_aliases: sharedAnime.title_aliases || [],
+      display_title: sharedAnime.display_title || null,
+      image_url: sharedAnime.image_url,
+      synopsis: sharedAnime.synopsis,
+      episodes_total: sharedAnime.episodes_total,
+      episodes_total_manual: sharedAnime.episodes_total_manual,
+      episodes_available: sharedAnime.episodes_available,
+      airing_status: sharedAnime.airing_status,
+      release_date: sharedAnime.release_date,
+      end_date: sharedAnime.end_date,
+      related_anime: sharedAnime.related_anime || [],
+      year: sharedAnime.year,
+      season: sharedAnime.season,
+      format: sharedAnime.format,
+      genres: sharedAnime.genres || [],
+      studios: sharedAnime.studios || [],
+      score_external: sharedAnime.score_external,
+      is_manual: Boolean(sharedAnime.is_manual)
+    };
+    startAdd(catalogEntry);
+  }
+
   function startAddToList(result, listId) {
     setPendingListId(listId);
     startAdd(result, 'planned');
@@ -1196,6 +1224,7 @@ export default function App() {
             }}
             onOpenProfile={profile => setCommunityTargetProfile(profile)}
             onActiveProfileChange={setCommunityTargetProfile}
+            onAddSharedAnime={startAddFromSharedAnime}
           />
         ) : (
           <ListsPage
@@ -1440,7 +1469,7 @@ function AnimeShelf({ title, subtitle, items, onViewAll, onOpenAnime }) {
   );
 }
 
-function PosterCard({ anime, onClick, compact = false }) {
+function PosterCard({ anime, onClick, compact = false, showProgress = true }) {
   const total = episodeProgressLimit(anime);
   const progress = total ? Math.min(100, (Number(anime.episode_current || 0) / total) * 100) : 0;
   return (
@@ -1450,7 +1479,7 @@ function PosterCard({ anime, onClick, compact = false }) {
         <span className={'status-pill tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
         {anime.format && <span className="poster-format-pill">{localizedFormat(anime.format)}</span>}
         {!['watching', 'paused'].includes(anime.status) && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
-        {anime.status === 'watching' && <>
+        {showProgress && anime.status === 'watching' && <>
           <span className={total ? 'poster-progress' : 'poster-progress is-indeterminate'}><i style={{ width: (total ? progress : 34) + '%' }} /></span>
           <span className="poster-episode-count">EP. {Number(anime.episode_current || 0)}{total ? ' / ' + total : ''}</span>
         </>}
@@ -2111,7 +2140,7 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
   );
 }
 
-function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, onActiveProfileChange, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
+function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, onActiveProfileChange, onAddSharedAnime, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
   const [query, setQuery] = useState(initialQuery || '');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(() => (pageMode ? initialProfile : null));
@@ -2451,17 +2480,14 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
       return <div className="social-empty"><Library size={23} /><strong>Biblioteca vazia</strong><span>Este perfil ainda não adicionou animes.</span></div>;
     }
     return (
-      <div className="social-anime-grid">
+      <div className="library-grid social-shared-library-grid">
         {ordered.map(anime => (
-          <article className="social-anime-card" key={anime.id}>
-            <div className="social-anime-art">
-              {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <Clapperboard size={22} />}
-              {anime.format && <span>{localizedFormat(anime.format)}</span>}
-            </div>
-            <strong>{displayTitle(anime)}</strong>
-            <small>{formatReleaseLabel(anime)}</small>
-            <em className={'tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</em>
-          </article>
+          <PosterCard
+            key={anime.id}
+            anime={anime}
+            showProgress={false}
+            onClick={() => onAddSharedAnime?.(anime)}
+          />
         ))}
       </div>
     );

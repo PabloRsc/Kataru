@@ -348,9 +348,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .rating-panel, .detail-notes-panel { min-width: 0; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .rating-panel .detail-block-heading, .detail-notes-panel .detail-block-heading { margin-bottom: 8px; }
 .star-rating { display: flex; align-items: center; gap: 3px; }
-.star-rating button { display: grid; place-items: center; padding: 2px; color: #56596A; background: none; border: 0; }
+.star-rating button {
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  color: #56596A;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: color .12s ease, transform .12s ease;
+}
 .star-rating button.filled { color: var(--yellow); }
 .star-rating button:hover { color: #FFE09A; transform: scale(1.08); }
+.star-rating button:focus-visible { outline: 1px solid var(--purple); outline-offset: 2px; border-radius: 4px; }
 .star-rating-symbol {
   position: relative;
   display: inline-block;

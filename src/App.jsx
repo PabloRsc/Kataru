@@ -1242,7 +1242,7 @@ function PosterCard({ anime, onClick, compact = false }) {
         </>}
       </div>
       <span className="poster-name">{displayTitle(anime)}</span>
-      <span className="poster-meta">{anime.year || 'Ano não informado'}{anime.format ? ' · ' + anime.format : ''}</span>
+      <span className="poster-meta">{formatReleaseLabel(anime)}{anime.format ? ' · ' + localizedFormat(anime.format) : ''}</span>
     </button>
   );
 }
@@ -1289,8 +1289,21 @@ function LibraryPage({
       {filtersActive && <div className="active-filters"><span>Filtros ativos:</span>{genreFilter && <button className="filter-chip" onClick={() => setGenreFilter('')}>{genreFilter}<X size={12} /></button>}{yearFilter && <button className="filter-chip" onClick={() => setYearFilter('')}>{yearFilter}<X size={12} /></button>}{formatFilter && <button className="filter-chip" onClick={() => setFormatFilter('')}>{FORMAT_FILTERS.find(category => category.id === formatFilter)?.label || localizedFormat(formatFilter)}<X size={12} /></button>}{ratingFilter && <button className="filter-chip" onClick={() => setRatingFilter('')}>{ratingFilter}+<X size={12} /></button>}<button className="clear-filters" onClick={clearFilters}>Limpar tudo</button></div>}
       <div className="results-summary"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{filter === 'all' ? 'Todos os status' : statusLabel(filter)}</span></div>
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando sua biblioteca...</div> : items.length ? (
-        gridMode === 'grid' ? <div className="library-grid">{items.map(anime => <PosterCard key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div> :
-          <div className="library-list">{items.map(anime => <AnimeRow key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>
+        <div className="library-groups">
+          {groupAnimeByFranchise(items).map(group => (
+            <section className={group.items.length > 1 ? 'library-franchise' : 'library-franchise-single'} key={group.key}>
+              {group.items.length > 1 && (
+                <div className="library-franchise-heading">
+                  <div><h2>{group.title}</h2><p>Temporadas e conteúdos relacionados</p></div>
+                  <span>{group.items.length} títulos · {formatReleaseLabel(group.items[0])} – {formatReleaseLabel(group.items[group.items.length - 1])}</span>
+                </div>
+              )}
+              {gridMode === 'grid'
+                ? <div className="library-grid">{group.items.map(anime => <PosterCard key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>
+                : <div className="library-list">{group.items.map(anime => <AnimeRow key={anime.id} anime={anime} onClick={() => onOpenAnime(anime)} />)}</div>}
+            </section>
+          ))}
+        </div>
       ) : (
         <div className="empty-state">
           <div className="empty-state-icon"><Library size={25} /></div>
@@ -1309,7 +1322,7 @@ function AnimeRow({ anime, onClick }) {
   return (
     <button className="anime-row" onClick={onClick}>
       {anime.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <div className="row-fallback"><Clapperboard size={20} /></div>}
-      <span className="row-title"><strong>{displayTitle(anime)}</strong><small>{anime.year || '—'} · {anime.format || 'Anime'}</small></span>
+      <span className="row-title"><strong>{displayTitle(anime)}</strong><small>{formatReleaseLabel(anime)} · {localizedFormat(anime.format)}</small></span>
       <span className={'row-status tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
       <span className={!total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}<i><b style={{ width: (total ? pct : 34) + '%' }} /></i></span>
       <span className="row-rating">{anime.status !== 'watching' && anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
@@ -1744,7 +1757,7 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
           <p className="eyebrow">DETALHES DO ANIME</p>
           <h1>{displayTitle(anime)}<span className="heading-dot">.</span></h1>
           {anime.title_english && anime.title_english !== anime.title && <p className="detail-original-title">{anime.title_english}</p>}
-          <div className="detail-meta"><span>{anime.year || 'Ano não informado'}</span>{anime.season && <><i>·</i><span>{anime.season}</span></>}</div>
+          <div className="detail-meta"><span>{formatReleaseLabel(anime)}</span>{anime.format && <><i>·</i><span>{localizedFormat(anime.format)}</span></>}{anime.season && <><i>·</i><span>{anime.season}</span></>}</div>
           {anime.studios?.length > 0 && <p className="detail-studio">Estúdio: {anime.studios.join(', ')}</p>}
           <div className="detail-tags">{(anime.genres || []).map(genre => <span key={genre}>{genre}</span>)}</div>
 

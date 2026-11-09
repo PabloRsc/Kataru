@@ -122,10 +122,24 @@ export async function searchKataruProfiles(query, limit = 20) {
   return data || [];
 }
 
+export async function isKataruUsernameAvailable(candidate) {
+  await requireUser();
+  const username = String(candidate || '').trim().toLowerCase();
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) return false;
+  const { data, error } = await supabase.rpc('is_kataru_username_available', { candidate: username });
+  if (error) throw error;
+  return Boolean(data);
+}
+
 export async function updateKataruProfile(profile) {
   const user = await requireUser();
+  const username = String(profile.username || '').trim().toLowerCase();
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+    throw new Error('O nome de usuário precisa ter de 3 a 20 caracteres, usando apenas letras, números ou _.');
+  }
   const payload = {
-    display_name: String(profile.display_name || '').trim().slice(0, 50),
+    username,
+    display_name: String(profile.display_name || '').trim().slice(0, 50) || null,
     bio: String(profile.bio || '').trim().slice(0, 160),
     updated_at: new Date().toISOString()
   };

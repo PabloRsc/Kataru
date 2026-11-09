@@ -1225,6 +1225,7 @@ export default function App() {
             onOpenProfile={profile => setCommunityTargetProfile(profile)}
             onActiveProfileChange={setCommunityTargetProfile}
             onAddSharedAnime={startAddFromSharedAnime}
+            onOpenOwnAnime={setSelected}
           />
         ) : (
           <ListsPage
@@ -2140,7 +2141,7 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
   );
 }
 
-function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, onActiveProfileChange, onAddSharedAnime, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
+function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, onActiveProfileChange, onAddSharedAnime, onOpenOwnAnime, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
   const [query, setQuery] = useState(initialQuery || '');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(() => (pageMode ? initialProfile : null));
@@ -2486,7 +2487,10 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
             key={anime.id}
             anime={anime}
             showProgress={false}
-            onClick={() => onAddSharedAnime?.(anime)}
+            onClick={() => {
+              if (selectedProfile?.user_id === currentUserId) onOpenOwnAnime?.(anime);
+              else onAddSharedAnime?.(anime);
+            }}
           />
         ))}
       </div>

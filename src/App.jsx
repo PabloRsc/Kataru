@@ -1174,6 +1174,7 @@ export default function App() {
               setCommunitySearchRequest(value => value + 1);
             }}
             onOpenProfile={profile => setCommunityTargetProfile(profile)}
+            onActiveProfileChange={setCommunityTargetProfile}
           />
         ) : (
           <ListsPage
@@ -1879,7 +1880,7 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
   );
 }
 
-function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
+function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, onActiveProfileChange, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
   const [query, setQuery] = useState(initialQuery || '');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -1963,6 +1964,7 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
   }
 
   async function openProfile(profile) {
+    if (pageMode) onActiveProfileChange?.(profile);
     setSelectedList(null);
     setConnectionsType(null);
     setConnections([]);

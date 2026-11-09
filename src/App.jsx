@@ -13,7 +13,8 @@ import {
   getCurrentKataruProfile, getFollowedKataruAnime, getFollowedKataruLists,
   getKataruProfile, getKataruRelationProfiles,
   getKataruSocialStats, isFollowingKataruUser, isKataruUsernameAvailable, searchKataruProfiles,
-  followKataruUser, unfollowKataruUser, updateKataruProfile, saveAnime, saveAnimeList, storageMode, supabase
+  followKataruUser, unfollowKataruUser, updateKataruProfile, uploadKataruAvatar, removeKataruAvatar,
+  getKataruAvatarPath, saveAnime, saveAnimeList, storageMode, supabase
 } from './storage';
 
 const STATUSES = [
@@ -1900,10 +1901,24 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ username: '', display_name: '', bio: '' });
   const [usernameAvailability, setUsernameAvailability] = useState('current');
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('');
+  const [removeAvatar, setRemoveAvatar] = useState(false);
+  const avatarInputRef = useRef(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [notice, setNotice] = useState('');
   const searchInputRef = useRef(null);
   const activeRouteProfileIdRef = useRef(null);
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreviewUrl('');
+      return undefined;
+    }
+    const previewUrl = URL.createObjectURL(avatarFile);
+    setAvatarPreviewUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [avatarFile]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -2128,15 +2143,25 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
     }
     setSavingProfile(true);
     setError('');
+    let uploadedAvatar = null;
     try {
       if (nextUsername !== currentUsername) {
         const available = await isKataruUsernameAvailable(nextUsername);
         if (!available) throw new Error('Esse nome de usuário já está em uso ou reservado. Escolha outro.');
       }
+
+      const previousAvatarPath = getKataruAvatarPath(selectedProfile.avatar_url);
+      let nextAvatarUrl = removeAvatar ? null : (selectedProfile.avatar_url || null);
+      if (avatarFile) {
+        uploadedAvatar = await uploadKataruAvatar(avatarFile);
+        nextAvatarUrl = uploadedAvatar.publicUrl;
+      }
+
       const nextDisplayName = String(profileForm.display_name || '').trim();
       const updated = await updateKataruProfile({
         ...profileForm,
         username: nextUsername,
+        avatar_url: nextAvatarUrl,
         // If the display name was only mirroring the old @, keep it in sync.
         display_name: nextDisplayName === currentUsername ? nextUsername : nextDisplayName
       });
@@ -2146,16 +2171,36 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
         display_name: updated.display_name || updated.username || '',
         bio: updated.bio || ''
       });
+      setAvatarFile(null);
+      setRemoveAvatar(false);
       setUsernameAvailability('current');
       setEditingProfile(false);
       setNotice('Seu perfil foi atualizado.');
+
+      const avatarChanged = Boolean(uploadedAvatar || removeAvatar);
+      if (avatarChanged && previousAvatarPath && previousAvatarPath !== (uploadedAvatar?.path || null)) {
+        removeKataruAvatar(previousAvatarPath).catch(() => {});
+      }
     } catch (saveError) {
+      if (uploadedAvatar?.path) removeKataruAvatar(uploadedAvatar.path).catch(() => {});
       setError(saveError.code === '23505'
         ? 'Esse nome de usuário acabou de ser escolhido. Tente outro.'
         : saveError.message || 'Não foi possível atualizar seu perfil.');
     } finally {
       setSavingProfile(false);
     }
+  }
+
+  function cancelProfileEditing() {
+    setProfileForm({
+      username: selectedProfile?.username || '',
+      display_name: selectedProfile?.display_name || selectedProfile?.username || '',
+      bio: selectedProfile?.bio || ''
+    });
+    setAvatarFile(null);
+    setRemoveAvatar(false);
+    setError('');
+    setEditingProfile(false);
   }
 
   function returnToUserSearch() {
@@ -2259,7 +2304,7 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
                       </div>
                       <div className="social-profile-actions">
                         {ownProfile
-                          ? <button className="outline-button" onClick={() => setEditingProfile(value => !value)}><Pencil size={14} />{editingProfile ? 'Cancelar edição' : 'Editar perfil'}</button>
+                          ? <button className="outline-button" onClick={() => editingProfile ? cancelProfileEditing() : setEditingProfile(true)}><Pencil size={14} />{editingProfile ? 'Cancelar edição' : 'Editar perfil'}</button>
                           : <button className={isFollowing ? 'outline-button social-following-button' : 'primary-button'} onClick={toggleFollow} disabled={busy}>
                               {busy ? <LoaderCircle size={15} className="spin" /> : isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
                               {busy ? 'Aguarde...' : isFollowing ? 'Seguindo' : 'Seguir'}
@@ -2273,6 +2318,51 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
                     </section>
                     {editingProfile && ownProfile && (
                       <form className="social-profile-edit" onSubmit={saveProfile}>
+                        <div className="social-avatar-editor">
+                          <SocialAvatar
+                            profile={{
+                              ...selectedProfile,
+                              avatar_url: avatarFile ? avatarPreviewUrl : removeAvatar ? null : selectedProfile.avatar_url
+                            }}
+                            size="large"
+                          />
+                          <div className="social-avatar-editor-copy">
+                            <strong>Foto de perfil</strong>
+                            <small>JPG, PNG ou WEBP · máximo 2 MB</small>
+                            <div className="social-avatar-editor-actions">
+                              <button type="button" className="outline-button" onClick={() => avatarInputRef.current?.click()} disabled={savingProfile}>
+                                <Pencil size={13} />{avatarFile || selectedProfile.avatar_url && !removeAvatar ? 'Trocar foto' : 'Adicionar foto'}
+                              </button>
+                              {(avatarFile || selectedProfile.avatar_url && !removeAvatar) && (
+                                <button type="button" className="social-avatar-remove" onClick={() => { setAvatarFile(null); setRemoveAvatar(true); }} disabled={savingProfile}>
+                                  <Trash2 size={13} />Remover
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <input
+                            ref={avatarInputRef}
+                            className="social-avatar-file-input"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={event => {
+                              const file = event.target.files?.[0];
+                              event.target.value = '';
+                              if (!file) return;
+                              if (!['image/jpeg','image/png','image/webp'].includes(file.type)) {
+                                setError('Use uma imagem JPG, PNG ou WEBP.');
+                                return;
+                              }
+                              if (file.size > 2 * 1024 * 1024) {
+                                setError('A imagem precisa ter no máximo 2 MB.');
+                                return;
+                              }
+                              setError('');
+                              setAvatarFile(file);
+                              setRemoveAvatar(false);
+                            }}
+                          />
+                        </div>
                         <label>Nome de usuário
                           <span className="social-username-edit-field"><span>@</span><input autoCapitalize="none" autoCorrect="off" spellCheck="false" maxLength={20} value={profileForm.username} onChange={event => setProfileForm(value => ({ ...value, username: event.target.value.toLowerCase() }))} placeholder="seu_usuario" /></span>
                           <small>Seu @ público. Use de 3 a 20 caracteres: letras, números ou _.</small>

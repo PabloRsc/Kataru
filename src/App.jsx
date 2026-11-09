@@ -1869,7 +1869,8 @@ function AvatarCropModal({ file, onCancel, onConfirm }) {
   const [sourceUrl, setSourceUrl] = useState('');
   const [dimensions, setDimensions] = useState(null);
   const [viewportSize, setViewportSize] = useState(320);
-  const [zoom, setZoom] = useState(1);
+  const MIN_CROP_ZOOM = 1.15;
+  const [zoom, setZoom] = useState(MIN_CROP_ZOOM);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -1919,7 +1920,7 @@ function AvatarCropModal({ file, onCancel, onConfirm }) {
   }
 
   function updateZoom(nextZoom) {
-    const safeZoom = Math.max(1, Math.min(4, Number(nextZoom) || 1));
+    const safeZoom = Math.max(MIN_CROP_ZOOM, Math.min(4, Number(nextZoom) || MIN_CROP_ZOOM));
     setZoom(safeZoom);
     const nextScale = baseScale * safeZoom;
     const nextMaxX = Math.max(0, (dimensions.width * nextScale - viewportSize) / 2);
@@ -1932,6 +1933,7 @@ function AvatarCropModal({ file, onCancel, onConfirm }) {
 
   function onPointerDown(event) {
     if (!dimensions || processing) return;
+    event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       pointerId: event.pointerId,
@@ -1945,6 +1947,7 @@ function AvatarCropModal({ file, onCancel, onConfirm }) {
   function onPointerMove(event) {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
     setOffset(clampOffset({
       x: drag.startOffset.x + event.clientX - drag.startX,
       y: drag.startOffset.y + event.clientY - drag.startY
@@ -2027,7 +2030,7 @@ function AvatarCropModal({ file, onCancel, onConfirm }) {
                   const image = event.currentTarget;
                   setDimensions({ width: image.naturalWidth, height: image.naturalHeight });
                   setOffset({ x: 0, y: 0 });
-                  setZoom(1);
+                  setZoom(MIN_CROP_ZOOM);
                   if (viewportRef.current) {
                     setViewportSize(viewportRef.current.getBoundingClientRect().width || 320);
                   }
@@ -2044,7 +2047,7 @@ function AvatarCropModal({ file, onCancel, onConfirm }) {
             <button type="button" onClick={() => updateZoom(zoom - 0.15)} disabled={zoom <= 1 || processing} aria-label="Diminuir zoom">−</button>
             <input
               type="range"
-              min="1"
+              min={MIN_CROP_ZOOM}
               max="4"
               step="0.01"
               value={zoom}
@@ -2737,7 +2740,7 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
   const current = Number(anime.episode_current || 0);
   const progress = progressTotal ? Math.min(100, Math.round((current / progressTotal) * 100)) : 0;
   const canAdvance = ['watching', 'paused', 'dropped'].includes(anime.status) && (!progressTotal || current < progressTotal);
-  const ratingStars = anime.rating_personal ? Math.round(Number(anime.rating_personal) / 2) : 0;
+  const ratingStars = anime.rating_personal ? Number(anime.rating_personal) / 2 : 0;
 
   return (
     <section className="detail-page">
@@ -2804,7 +2807,38 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
 }
 
 function StarRating({ value, onChange }) {
-  return <div className="star-rating" role="group" aria-label="Sua nota de zero a cinco estrelas">{[1, 2, 3, 4, 5].map(star => <button type="button" key={star} className={star <= value ? 'filled' : ''} onClick={() => onChange(star === value ? 0 : star)} aria-label={star + ' estrelas'}><Star size={23} fill={star <= value ? 'currentColor' : 'none'} /></button>)}</div>;
+  const currentValue = Math.max(0, Math.min(5, Number(value) || 0));
+  return (
+    <div className="star-rating" role="group" aria-label="Sua nota de zero a cinco estrelas, com intervalos de meia estrela">
+      {[1, 2, 3, 4, 5].map(star => {
+        const fill = Math.max(0, Math.min(1, currentValue - (star - 1)));
+        return (
+          <button
+            type="button"
+            key={star}
+            className={fill > 0 ? 'filled' : ''}
+            onClick={event => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              const clickedLeftHalf = event.detail !== 0 && event.clientX - rect.left < rect.width / 2;
+              const nextValue = star - (clickedLeftHalf ? 0.5 : 0);
+              onChange(Math.abs(nextValue - currentValue) < 0.001 ? 0 : nextValue);
+            }}
+            aria-label={star + ' estrelas; metade esquerda para ' + (star - 0.5)}
+            title={'Clique na metade esquerda para ' + (star - 0.5) + ' ou na direita para ' + star}
+          >
+            <span className="star-rating-symbol">
+              <Star className="star-rating-empty" size={23} />
+              {fill > 0 && (
+                <span className="star-rating-fill" style={{ width: (fill * 100) + '%' }}>
+                  <Star size={23} fill="currentColor" />
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function SearchModal({ query, setQuery, searchMode = 'add', results, searching, error, onSearch, onClose, onAdd, onOpenExisting, onManual, isInCollection, allowExisting, libraryItems = [], alreadyInListIds = [], targetListName = '' }) {
@@ -2950,7 +2984,7 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
             <label className="field rewatch-field"><span>Quantas vezes reassistiu?</span><input type="number" min="0" value={form.rewatch_count} onChange={event => update('rewatch_count', Math.max(0, Number(event.target.value || 0)))} /></label>
           </>
         )}
-        {showRating && <div className="editor-section rating-editor"><div><span className="field-label">Sua nota (opcional)</span><small>Avalie de 1 a 5 estrelas.</small></div><StarRating value={form.rating_personal ? Math.round(Number(form.rating_personal) / 2) : 0} onChange={stars => update('rating_personal', stars ? stars * 2 : '')} /></div>}
+        {showRating && <div className="editor-section rating-editor"><div><span className="field-label">Sua nota (opcional)</span><small>Avalie de 1 a 5 estrelas, em intervalos de 0,5.</small></div><StarRating value={form.rating_personal ? Number(form.rating_personal) / 2 : 0} onChange={stars => update('rating_personal', stars ? stars * 2 : '')} /></div>}
         {!form.is_manual && <div className="editor-catalog-actions"><p className="editor-catalog-note">Os dados básicos são obtidos automaticamente do catálogo.</p><button type="button" className="text-button" onClick={async () => { const restored = await onRestoreCatalog(); if (restored) setCatalogRestored(true); }}>Atualizar dados do catálogo</button></div>}
         <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancelar</button><button className="primary-button" disabled={saving}>{saving ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{isNew ? 'Adicionar à biblioteca' : 'Salvar alterações'}</button></div>
       </form>

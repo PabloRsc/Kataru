@@ -584,15 +584,37 @@ export default function App() {
     }
     setSaving(true);
     try {
-      const catalogTotal = isCurrentlyAiring(editor) ? null : totalEpisodes(editor);
-      const available = episodeProgressLimit(editor);
-      const completedCount = catalogTotal || available || Number(editor.episode_current || 0);
+      let catalogEditor = editor;
+      if (!editor.is_manual && (!editor.release_date || !editor.related_anime?.length)) {
+        try {
+          const fresh = await fetchAnime(editor.mal_id);
+          catalogEditor = {
+            ...editor,
+            ...fresh,
+            id: editor.id,
+            mal_id: editor.mal_id,
+            status: editor.status,
+            episode_current: editor.episode_current,
+            rating_personal: editor.rating_personal,
+            rewatch_count: editor.rewatch_count,
+            started_at: editor.started_at,
+            completed_at: editor.completed_at,
+            display_title: editor.display_title,
+            episodes_total_manual: editor.episodes_total_manual
+          };
+        } catch {
+          // Save the selected search result even when the detail provider is temporarily unavailable.
+        }
+      }
+      const catalogTotal = isCurrentlyAiring(catalogEditor) ? null : totalEpisodes(catalogEditor);
+      const available = episodeProgressLimit(catalogEditor);
+      const completedCount = catalogTotal || available || Number(catalogEditor.episode_current || 0);
       const anime = {
-        ...editor,
+        ...catalogEditor,
         ...form,
-        id: String(editor.id || editor.mal_id),
-        mal_id: Number(editor.mal_id),
-        title: form.is_manual ? form.title.trim() : (editor.title || form.title),
+        id: String(catalogEditor.id || catalogEditor.mal_id),
+        mal_id: Number(catalogEditor.mal_id),
+        title: form.is_manual ? form.title.trim() : (catalogEditor.title || form.title),
         episode_current: form.status === 'planned' ? 0
           : form.status === 'completed' ? completedCount
           : Math.max(0, Number(form.episode_current || 0)),

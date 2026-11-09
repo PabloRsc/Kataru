@@ -140,8 +140,13 @@ const episodeProgressLimit = anime => isCurrentlyAiring(anime)
 const statusLabel = id => STATUSES.find(status => status.id === id)?.label || 'Quero assistir';
 const statusTone = id => STATUSES.find(status => status.id === id)?.tone || 'yellow';
 const sortByRecent = (a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+const releaseDateOnly = value => {
+  const match = String(value || '').match(/^\\d{4}-\\d{2}-\\d{2}/);
+  return match ? match[0] : null;
+};
 const releaseTimestamp = anime => {
-  const exact = anime?.release_date ? Date.parse(anime.release_date + (String(anime.release_date).length === 10 ? 'T12:00:00' : '')) : NaN;
+  const dateOnly = releaseDateOnly(anime?.release_date);
+  const exact = dateOnly ? Date.parse(dateOnly + 'T12:00:00') : NaN;
   if (Number.isFinite(exact)) return exact;
   const year = Number(anime?.year) || null;
   return year ? Date.UTC(year, 0, 1) : null;
@@ -155,8 +160,9 @@ const compareReleaseDate = (a, b) => {
   return left - right || displayTitle(a).localeCompare(displayTitle(b), 'pt-BR');
 };
 const formatReleaseLabel = anime => {
-  if (anime?.release_date) {
-    const date = new Date(anime.release_date + (String(anime.release_date).length === 10 ? 'T12:00:00' : ''));
+  const dateOnly = releaseDateOnly(anime?.release_date);
+  if (dateOnly) {
+    const date = new Date(dateOnly + 'T12:00:00');
     if (!Number.isNaN(date.getTime())) {
       return date.toLocaleDateString('pt-BR', {
         day: '2-digit',
@@ -1346,7 +1352,7 @@ function LibraryPage({
       <PageIntro
         eyebrow="SUA COLEÇÃO PESSOAL"
         title="Biblioteca"
-        subtitle="Tudo o que você acompanha, em um só lugar."
+        subtitle="Separada por formato e organizada pelo lançamento; temporadas relacionadas aparecem juntas."
         action={<div className="library-view-actions">
           <button className="outline-button library-sync-button" onClick={onSyncMetadata} disabled={syncBusy || !allItems.some(anime => !anime.is_manual)}>
             {syncBusy ? `Atualizando ${syncProgress?.current || 0}/${syncProgress?.total || 0}...` : 'Atualizar datas e temporadas'}

@@ -334,6 +334,7 @@ export default function App() {
   const [pendingListId, setPendingListId] = useState(null);
   const [authUser, setAuthUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [communityOpen, setCommunityOpen] = useState(false);
   const [communityProfileRequest, setCommunityProfileRequest] = useState(0);
   const [communitySearchRequest, setCommunitySearchRequest] = useState(0);
   const profileRef = useRef(null);
@@ -1011,8 +1012,8 @@ export default function App() {
                   </nav>
         <div className="topbar-actions">
           <button className="global-search" aria-label="Buscar usuários" onClick={() => {
+            setCommunityOpen(true);
             setCommunitySearchRequest(value => value + 1);
-            navigate('community');
           }}><Search size={16} /><span>Buscar usuários...</span></button>
           <button className="primary-button top-add" onClick={() => {
             setSearchMode('add'); setSearchOpen(true); setSearchQuery(''); setResults([]);
@@ -1035,7 +1036,7 @@ export default function App() {
                 <strong>{authUser?.user_metadata?.username || authUser?.user_metadata?.username || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
                 <span>{authUser?.email || 'Seus dados ficam salvos neste navegador.'}</span>
               </div>
-              {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={() => { setProfileOpen(false); setCommunityProfileRequest(value => value + 1); navigate('community'); }}><UserRound size={15} />Meu perfil</button>}
+              {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={() => { setProfileOpen(false); setCommunityOpen(true); setCommunityProfileRequest(value => value + 1); }}><UserRound size={15} />Meu perfil</button>}
               {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={async () => {
                 setProfileOpen(false);
                 const { error } = await supabase.auth.signOut();
@@ -1143,8 +1144,6 @@ export default function App() {
             findInCollection={anime => items.find(item => String(item.mal_id) === String(anime.mal_id)) || null}
             isInCollection={isInCollection}
           />
-        ) : page === 'community' ? (
-          <CommunityPage currentUserId={authUser?.id} openMyProfileSignal={communityProfileRequest} acknowledgeMyProfileRequest={setCommunityProfileRequest} focusSearchSignal={communitySearchRequest} acknowledgeSearchRequest={setCommunitySearchRequest} />
         ) : (
           <ListsPage
             items={items}
@@ -1175,6 +1174,18 @@ export default function App() {
         <button className={page === 'discover' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('discover')}><Compass size={19} /><span>Descobrir</span></button>
         <button className={page === 'lists' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('lists')}><List size={19} /><span>Listas</span></button>
       </nav>
+
+      {communityOpen && (
+        <CommunityPage
+          open
+          onClose={() => setCommunityOpen(false)}
+          currentUserId={authUser?.id}
+          openMyProfileSignal={communityProfileRequest}
+          acknowledgeMyProfileRequest={setCommunityProfileRequest}
+          focusSearchSignal={communitySearchRequest}
+          acknowledgeSearchRequest={setCommunitySearchRequest}
+        />
+      )}
 
       {searchOpen && (
         <SearchModal
@@ -1832,7 +1843,7 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
   );
 }
 
-function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
+function CommunityPage({ open, onClose, currentUserId, openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -1853,6 +1864,15 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
   const [savingProfile, setSavingProfile] = useState(false);
   const [notice, setNotice] = useState('');
   const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [open, onClose]);
 
   useEffect(() => {
     if (focusSearchSignal > 0) {
@@ -2058,6 +2078,12 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
     );
   }
 
+  if (!open) return null;
+
+  const modalTitle = selectedProfile
+    ? (selectedProfile.display_name || selectedProfile.username)
+    : 'Buscar usuários';
+
   if (selectedProfile) {
     const ownProfile = selectedProfile.user_id === currentUserId;
     const visible = ownProfile || isFollowing;
@@ -2066,7 +2092,13 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
       : [];
 
     return (
-      <div className="community-page">
+      <div className="overlay social-community-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
+        <section className="modal social-community-modal" role="dialog" aria-modal="true" aria-label={modalTitle}>
+          <div className="modal-header social-community-modal-header">
+            <div><p className="eyebrow">COMUNIDADE KATARU</p><h2>{modalTitle}</h2></div>
+            <button className="icon-button" onClick={onClose} aria-label="Fechar busca"><X size={17} /></button>
+          </div>
+          <div className="community-page">
         <button className="back-link" onClick={selectedList ? () => setSelectedList(null) : connectionsType ? () => setConnectionsType(null) : returnToUserSearch}>
           <ChevronLeft size={16} />{selectedList ? 'Voltar às listas' : connectionsType ? 'Voltar ao perfil' : 'Voltar à busca de usuários'}
         </button>
@@ -2144,18 +2176,20 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
             )}
           </>
         )}
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="community-page">
-      <PageIntro
-        eyebrow="COMUNIDADE KATARU"
-        title="Buscar usuários"
-        subtitle="Encontre pessoas pelo nome ou @usuário para acompanhar suas bibliotecas e listas."
-        action={<button className="outline-button" onClick={openMyProfile}><UserRound size={15} />Meu perfil</button>}
-      />
+    <div className="overlay social-community-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
+      <section className="modal social-community-modal" role="dialog" aria-modal="true" aria-label="Buscar usuários">
+        <div className="modal-header social-community-modal-header">
+          <div><p className="eyebrow">COMUNIDADE KATARU</p><h2>Buscar usuários</h2><p>Encontre pessoas para acompanhar suas bibliotecas e listas.</p></div>
+          <button className="icon-button" onClick={onClose} aria-label="Fechar busca"><X size={17} /></button>
+        </div>
+        <div className="community-page">
       <label className="social-search-field"><Search size={17} /><input ref={searchInputRef} autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar por usuário ou nome de exibição..." /><kbd>⌕</kbd></label>
       <p className="social-search-note">Pesquise pelo @usuário ou nome de exibição. Digite pelo menos 2 caracteres.</p>
       {error && <div className="social-error">{error}</div>}
@@ -2165,7 +2199,9 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
         </div>
       ) : <div className="social-empty"><Users size={23} /><strong>Nenhum usuário encontrado</strong><span>Confira o nome ou @usuário e tente novamente.</span></div> : (
         <div className="social-discover-empty"><Users size={25} /><strong>Encontre pessoas no Kataru</strong><p>Digite um nome ou @usuário para abrir o perfil, seguir e acompanhar bibliotecas e listas.</p></div>
-      )}
+        )}
+        </div>
+      </section>
     </div>
   );
 }

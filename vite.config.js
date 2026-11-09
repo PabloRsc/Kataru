@@ -12,7 +12,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api/catalog': jikanProxy(path => path.replace(/^\/api\/catalog/, '/v4')),
+      '/api/catalog': jikanProxy(path => {
+        const url = new URL(path, 'http://localhost');
+        url.pathname = url.pathname.replace(/^\/api\/catalog/, '/v4');
+        url.searchParams.delete('ranking');
+        return url.pathname + url.search;
+      }),
       '/api/seasons': jikanProxy(path => path.replace(/^\/api\/seasons/, '/v4/seasons')),
       '/api/top': jikanProxy(path => path.replace(/^\/api\/top/, '/v4/top')),
       '/api/anime': jikanProxy(path => {

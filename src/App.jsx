@@ -1143,7 +1143,7 @@ export default function App() {
             isInCollection={isInCollection}
           />
         ) : page === 'community' ? (
-          <CommunityPage currentUserId={authUser?.id} openMyProfileSignal={communityProfileRequest} />
+          <CommunityPage currentUserId={authUser?.id} openMyProfileSignal={communityProfileRequest} acknowledgeMyProfileRequest={setCommunityProfileRequest} />
         ) : (
           <ListsPage
             items={items}
@@ -1832,7 +1832,7 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
   );
 }
 
-function CommunityPage({ currentUserId, openMyProfileSignal = 0 }) {
+function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyProfileRequest }) {
   const [tab, setTab] = useState('discover');
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -1957,8 +1957,11 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0 }) {
   }
 
   useEffect(() => {
-    if (openMyProfileSignal > 0) openMyProfile();
-  }, [openMyProfileSignal]);
+    if (openMyProfileSignal > 0) {
+      acknowledgeMyProfileRequest?.(0);
+      openMyProfile();
+    }
+  }, [openMyProfileSignal, acknowledgeMyProfileRequest]);
 
   async function toggleFollow() {
     if (!selectedProfile || selectedProfile.user_id === currentUserId || busy) return;

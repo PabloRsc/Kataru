@@ -78,5 +78,20 @@ create trigger on_kataru_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_kataru_new_auth_user();
 
+-- Função de evento do banco: não deve ser exposta como RPC pública.
+-- A execução do event trigger continua sob o proprietário (postgres).
+do $
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    execute 'revoke all privileges on function public.rls_auto_enable() from public, anon, authenticated';
+  end if;
+end;
+$;
+
+-- Esta RPC é intencionalmente pública para validar username antes do cadastro;
+-- ela retorna somente um booleano e não expõe os registros de perfil.
+comment on function public.is_kataru_username_available(text) is
+  'Public signup helper: returns only whether a username is available; does not expose profile rows.';
+
 notify pgrst, 'reload schema';
 commit;

@@ -1906,6 +1906,8 @@ function CommunityPage({ currentUserId }) {
     setConnectionsType(null);
     setConnections([]);
     setSelectedProfile(profile);
+    setIsFollowing(false);
+    setProfileStats({ followers: 0, following: 0 });
     setProfileAnime([]);
     setProfileLists([]);
     setProfileTab('library');
@@ -2133,7 +2135,6 @@ function CommunityPage({ currentUserId }) {
             )}
           </>
         )}
-        {error && !connectionsType && <div className="social-error">{error}</div>}
       </div>
     );
   }

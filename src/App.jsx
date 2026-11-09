@@ -1865,6 +1865,202 @@ function SocialAvatar({ profile, size = 'medium' }) {
   );
 }
 
+function AvatarCropModal({ file, onCancel, onConfirm }) {
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [dimensions, setDimensions] = useState(null);
+  const [viewportSize, setViewportSize] = useState(320);
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const imageRef = useRef(null);
+  const viewportRef = useRef(null);
+  const dragRef = useRef(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setSourceUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  useEffect(() => {
+    const measure = () => {
+      if (viewportRef.current) {
+        setViewportSize(viewportRef.current.getBoundingClientRect().width || 320);
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [sourceUrl]);
+
+  useEffect(() => {
+    const onKeyDown = event => {
+      if (event.key === 'Escape' && !processing) onCancel?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onCancel, processing]);
+
+  const baseScale = dimensions
+    ? Math.max(viewportSize / dimensions.width, viewportSize / dimensions.height)
+    : 1;
+  const scale = baseScale * zoom;
+  const displayWidth = dimensions ? dimensions.width * scale : viewportSize;
+  const displayHeight = dimensions ? dimensions.height * scale : viewportSize;
+  const maxOffsetX = Math.max(0, (displayWidth - viewportSize) / 2);
+  const maxOffsetY = Math.max(0, (displayHeight - viewportSize) / 2);
+
+  function clampOffset(nextOffset) {
+    return {
+      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, nextOffset.x)),
+      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, nextOffset.y))
+    };
+  }
+
+  function updateZoom(nextZoom) {
+    const safeZoom = Math.max(1, Math.min(4, Number(nextZoom) || 1));
+    setZoom(safeZoom);
+    const nextScale = baseScale * safeZoom;
+    const nextMaxX = Math.max(0, (dimensions.width * nextScale - viewportSize) / 2);
+    const nextMaxY = Math.max(0, (dimensions.height * nextScale - viewportSize) / 2);
+    setOffset(current => ({
+      x: Math.max(-nextMaxX, Math.min(nextMaxX, current.x)),
+      y: Math.max(-nextMaxY, Math.min(nextMaxY, current.y))
+    }));
+  }
+
+  function onPointerDown(event) {
+    if (!dimensions || processing) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startOffset: offset
+    };
+    setDragging(true);
+  }
+
+  function onPointerMove(event) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    setOffset(clampOffset({
+      x: drag.startOffset.x + event.clientX - drag.startX,
+      y: drag.startOffset.y + event.clientY - drag.startY
+    }));
+  }
+
+  function onPointerUp(event) {
+    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    setDragging(false);
+  }
+
+  function confirmCrop() {
+    const image = imageRef.current;
+    if (!image || !dimensions || !scale) return;
+    setProcessing(true);
+    try {
+      const imageLeft = viewportSize / 2 - displayWidth / 2 + offset.x;
+      const imageTop = viewportSize / 2 - displayHeight / 2 + offset.y;
+      const sourceX = Math.max(0, Math.min(dimensions.width, (0 - imageLeft) / scale));
+      const sourceY = Math.max(0, Math.min(dimensions.height, (0 - imageTop) / scale));
+      const sourceSize = Math.min(
+        viewportSize / scale,
+        dimensions.width - sourceX,
+        dimensions.height - sourceY
+      );
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Não foi possível preparar a imagem.');
+      context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 512, 512);
+      canvas.toBlob(blob => {
+        if (!blob) {
+          setProcessing(false);
+          return;
+        }
+        const croppedFile = new File([blob], 'kataru-avatar.jpg', {
+          type: 'image/jpeg',
+          lastModified: Date.now()
+        });
+        onConfirm?.(croppedFile);
+      }, 'image/jpeg', 0.92);
+    } catch {
+      setProcessing(false);
+    }
+  }
+
+  return (
+    <div className="avatar-crop-overlay" onMouseDown={event => {
+      if (event.target === event.currentTarget && !processing) onCancel?.();
+    }}>
+      <section className="avatar-crop-dialog" role="dialog" aria-modal="true" aria-label="Ajustar foto de perfil">
+        <header className="avatar-crop-header">
+          <button type="button" className="avatar-crop-close" onClick={onCancel} disabled={processing} aria-label="Cancelar recorte">
+            <X size={20} />
+          </button>
+          <strong>Arraste a imagem para ajustar</strong>
+          <button type="button" className="avatar-crop-load" onClick={confirmCrop} disabled={!dimensions || processing}>
+            {processing ? <LoaderCircle size={16} className="spin" /> : <Check size={17} />}
+            {processing ? 'Preparando...' : 'Carregar'}
+          </button>
+        </header>
+        <div className="avatar-crop-body">
+          <div
+            ref={viewportRef}
+            className={'avatar-crop-viewport' + (dragging ? ' is-dragging' : '')}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+          >
+            {sourceUrl && (
+              <img
+                ref={imageRef}
+                src={sourceUrl}
+                alt="Prévia para recorte"
+                draggable="false"
+                onLoad={event => {
+                  const image = event.currentTarget;
+                  setDimensions({ width: image.naturalWidth, height: image.naturalHeight });
+                  setOffset({ x: 0, y: 0 });
+                  setZoom(1);
+                  if (viewportRef.current) {
+                    setViewportSize(viewportRef.current.getBoundingClientRect().width || 320);
+                  }
+                }}
+                style={{
+                  width: displayWidth,
+                  height: displayHeight,
+                  transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`
+                }}
+              />
+            )}
+          </div>
+          <div className="avatar-crop-controls">
+            <button type="button" onClick={() => updateZoom(zoom - 0.15)} disabled={zoom <= 1 || processing} aria-label="Diminuir zoom">−</button>
+            <input
+              type="range"
+              min="1"
+              max="4"
+              step="0.01"
+              value={zoom}
+              onChange={event => updateZoom(event.target.value)}
+              disabled={!dimensions || processing}
+              aria-label="Zoom da foto"
+            />
+            <button type="button" onClick={() => updateZoom(zoom + 0.15)} disabled={zoom >= 4 || processing} aria-label="Aumentar zoom">+</button>
+          </div>
+          <p className="avatar-crop-hint">Mova a imagem para encaixar seu rosto no círculo</p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function SocialUserCard({ profile, onOpen, action, hint }) {
   return (
     <article className="social-user-card">
@@ -1903,6 +2099,7 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
   const [usernameAvailability, setUsernameAvailability] = useState('current');
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('');
+  const [avatarCropFile, setAvatarCropFile] = useState(null);
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const avatarInputRef = useRef(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -2198,6 +2395,7 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
       bio: selectedProfile?.bio || ''
     });
     setAvatarFile(null);
+    setAvatarCropFile(null);
     setRemoveAvatar(false);
     setError('');
     setEditingProfile(false);
@@ -2318,28 +2516,24 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
                     </section>
                     {editingProfile && ownProfile && (
                       <form className="social-profile-edit" onSubmit={saveProfile}>
-                        <div className="social-avatar-editor">
-                          <SocialAvatar
-                            profile={{
-                              ...selectedProfile,
-                              avatar_url: avatarFile ? avatarPreviewUrl : removeAvatar ? null : selectedProfile.avatar_url
-                            }}
-                            size="large"
-                          />
-                          <div className="social-avatar-editor-copy">
-                            <strong>Foto de perfil</strong>
-                            <small>JPG, PNG ou WEBP · máximo 2 MB</small>
-                            <div className="social-avatar-editor-actions">
-                              <button type="button" className="outline-button" onClick={() => avatarInputRef.current?.click()} disabled={savingProfile}>
-                                <Pencil size={13} />{avatarFile || selectedProfile.avatar_url && !removeAvatar ? 'Trocar foto' : 'Adicionar foto'}
-                              </button>
-                              {(avatarFile || selectedProfile.avatar_url && !removeAvatar) && (
-                                <button type="button" className="social-avatar-remove" onClick={() => { setAvatarFile(null); setRemoveAvatar(true); }} disabled={savingProfile}>
-                                  <Trash2 size={13} />Remover
-                                </button>
-                              )}
-                            </div>
-                          </div>
+                        <div className="social-avatar-picker-row">
+                          <button
+                            type="button"
+                            className="social-avatar-picker"
+                            onClick={() => avatarInputRef.current?.click()}
+                            disabled={savingProfile}
+                            aria-label="Escolher foto de perfil"
+                            title="Escolher foto de perfil"
+                          >
+                            <SocialAvatar
+                              profile={{
+                                ...selectedProfile,
+                                avatar_url: avatarFile ? avatarPreviewUrl : removeAvatar ? null : selectedProfile.avatar_url
+                              }}
+                              size="large"
+                            />
+                            <span className="social-avatar-picker-plus"><Plus size={17} strokeWidth={2.5} /></span>
+                          </button>
                           <input
                             ref={avatarInputRef}
                             className="social-avatar-file-input"
@@ -2358,8 +2552,7 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
                                 return;
                               }
                               setError('');
-                              setAvatarFile(file);
-                              setRemoveAvatar(false);
+                              setAvatarCropFile(file);
                             }}
                           />
                         </div>
@@ -2399,6 +2592,18 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
                       <div className="social-private-state"><Users size={25} /><strong>Biblioteca e listas para seguidores</strong><p>Siga @{selectedProfile.username} para acompanhar seus animes e listas.</p><button className="primary-button" onClick={toggleFollow} disabled={busy}><UserPlus size={15} />Seguir para ver o perfil</button></div>
                     )}
                   </>
+                )}
+                {avatarCropFile && (
+                  <AvatarCropModal
+                    file={avatarCropFile}
+                    onCancel={() => setAvatarCropFile(null)}
+                    onConfirm={croppedFile => {
+                      setAvatarFile(croppedFile);
+                      setAvatarCropFile(null);
+                      setRemoveAvatar(false);
+                      setError('');
+                    }}
+                  />
                 )}
       </>
     );

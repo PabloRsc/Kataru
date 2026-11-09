@@ -17,7 +17,7 @@ begin
 end $;
 
 revoke update on table public.kataru_profiles from authenticated;
-grant update (username, display_name, bio) on table public.kataru_profiles to authenticated;
+grant update (username, display_name, bio, avatar_url) on table public.kataru_profiles to authenticated;
 
 update public.kataru_profiles as profile
 set

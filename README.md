@@ -37,10 +37,11 @@ Sem variáveis Supabase, o app permanece em modo local para desenvolvimento. Os 
 2. Para um banco novo, execute **supabase/schema.sql**. Para um banco já usado por uma versão anterior, faça backup e execute **supabase/redesign-migration.sql**.
 3. Execute **supabase/auth-profiles-setup.sql** para criar perfis e a verificação segura de nomes de usuário.
 4. Execute **supabase/social-follows-migration.sql** para habilitar descoberta de perfis, seguidores e projeções seguras de bibliotecas/listas compartilhadas.
-5. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
-6. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
-7. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
-8. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
+5. Em instalações que já receberam a migração social anterior, execute **supabase/social-follows-privacy-hardening.sql** para restringir a projeção aos campos não pessoais.
+6. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
+7. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
+8. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
+9. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
 
 A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha, opção Google, confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. Com Supabase configurado, a coleção exige sessão autenticada.
 
@@ -58,7 +59,7 @@ Não execute essa migração em um banco vazio como substituto de **schema.sql**
 
 ### Segurança e migração de dados
 
-- Cada registro possui **owner_id**; as tabelas privadas continuam limitadas ao proprietário. O recurso social usa uma projeção separada, sem anotações nem datas pessoais, liberada somente ao próprio usuário e a quem ele segue.
+- Cada registro possui **owner_id**; as tabelas privadas continuam limitadas ao proprietário. O recurso social usa uma projeção separada, liberada somente ao próprio usuário e a quem ele segue. Ela compartilha títulos e status, mas não anotações, datas pessoais, progresso de episódios, notas pessoais ou contagem de reassistidas.
 - Nunca coloque a chave **service_role** em variáveis **VITE_*** ou no navegador.
 - O script **supabase/auth-profiles-setup.sql** também remove `EXECUTE` público da função administrativa `rls_auto_enable()`; a função pública `is_kataru_username_available()` retorna somente um booleano e é necessária ao cadastro.
 - Registros de instalações antigas sem **owner_id** permanecem inacessíveis até serem atribuídos manualmente ao usuário correto. Faça backup antes da migração; não associe registros antigos automaticamente.

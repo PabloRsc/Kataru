@@ -14,7 +14,10 @@ begin
       add constraint kataru_profiles_username_length_check
       check (char_length(username) between 3 and 20);
   end if;
-end $$;
+end $;
+
+revoke update on table public.kataru_profiles from authenticated;
+grant update (username, display_name, bio) on table public.kataru_profiles to authenticated;
 
 update public.kataru_profiles as profile
 set

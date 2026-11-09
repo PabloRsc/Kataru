@@ -41,7 +41,8 @@ Sem variáveis Supabase, o app permanece em modo local para desenvolvimento. Os 
 6. Em contas/perfis sociais já existentes, execute **supabase/profile-identity-migration.sql** para alinhar a data pública à data original da conta e normalizar nomes genéricos de perfis antigos.
 7. Execute **supabase/profile-avatar-storage-migration.sql** para criar o bucket público de fotos de perfil e as políticas de upload/exclusão por usuário.
 8. Execute **supabase/episode-unknown-and-paused-rating-migration.sql** para registrar quando o usuário não lembra o episódio em títulos pausados/abandonados e limpar notas de títulos pausados.
-9. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
+9. Execute **supabase/shared-library-ratings-migration.sql** para permitir que seguidores vejam a nota pessoal dos animes, mantendo o progresso e as anotações privados.
+10. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
 10. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
 11. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
 12. Reinicie o Vite, crie uma conta na tela do Kataru e entre.

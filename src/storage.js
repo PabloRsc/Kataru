@@ -109,12 +109,13 @@ export async function deleteAnime(id) {
 
 export async function searchKataruProfiles(query, limit = 20) {
   const user = await requireUser();
-  const term = String(query || '').trim().replace(/[%,()]/g, ' ');
+  const term = String(query || '').trim().replace(/[^\p{L}\p{N}_ -]/gu, ' ').replace(/\s+/g, ' ');
   if (term.length < 2) return [];
+  const filter = 'username.ilike.%' + term + '%,display_name.ilike.%' + term + '%';
   const { data, error } = await supabase.from('kataru_profiles')
     .select('user_id, username, display_name, bio, avatar_url, created_at')
     .neq('user_id', user.id)
-    .ilike('username', '%' + term + '%')
+    .or(filter)
     .order('username', { ascending: true })
     .limit(Math.min(40, Math.max(1, Number(limit) || 20)));
   if (error) throw error;

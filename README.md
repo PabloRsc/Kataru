@@ -10,6 +10,7 @@ A navegação está organizada em quatro áreas:
 - **Biblioteca:** visualização em grade ou lista, busca, filtros por status, gênero, ano, formato e nota, além de ordenação.
 - **Descobrir:** títulos em alta, mais bem avaliados e navegação por gêneros, com capas e inclusão manual na biblioteca. Não inclui calendário de lançamentos.
 - **Listas:** listas automáticas por status e listas temáticas criadas pelo usuário.
+- **Pessoas:** busca por nome de usuário, seguir/deixar de seguir, perfis com estatísticas, biblioteca e listas de pessoas seguidas.
 
 Os detalhes de cada anime incluem status, progresso por episódio, avaliação pessoal por estrelas, anotações, datas, reassistidas e informações do catálogo. A edição permite ajustar título exibido e total de episódios manualmente, além de adicionar um título sem catálogo.
 
@@ -34,11 +35,12 @@ Sem variáveis Supabase, o app permanece em modo local para desenvolvimento. Os 
 
 1. Crie um projeto no [Supabase](https://supabase.com).
 2. Para um banco novo, execute **supabase/schema.sql**. Para um banco já usado por uma versão anterior, faça backup e execute **supabase/redesign-migration.sql**.
-3. Execute **supabase/auth-profiles-setup.sql** para criar perfis e a verificação segura de nomes de usuário. Essa configuração já foi aplicada no projeto Supabase conectado ao Kataru.
-4. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
-5. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
-6. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
-7. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
+3. Execute **supabase/auth-profiles-setup.sql** para criar perfis e a verificação segura de nomes de usuário.
+4. Execute **supabase/social-follows-migration.sql** para habilitar descoberta de perfis, seguidores e projeções seguras de bibliotecas/listas compartilhadas.
+5. Em Authentication → Providers, habilite Email e configure confirmação de e-mail conforme sua preferência.
+6. Em Authentication → URL Configuration, configure Site URL e Redirect URLs para produção, previews e ambiente local.
+7. Copie **.env.example** para **.env** e preencha **VITE_SUPABASE_URL** e **VITE_SUPABASE_ANON_KEY**.
+8. Reinicie o Vite, crie uma conta na tela do Kataru e entre.
 
 A tela de conta inclui cadastro com nome de usuário único, login por e-mail/senha, opção Google, confirmação de e-mail, recuperação de acesso, troca de senha e controle de sessão persistente ou temporária. Com Supabase configurado, a coleção exige sessão autenticada.
 
@@ -56,12 +58,12 @@ Não execute essa migração em um banco vazio como substituto de **schema.sql**
 
 ### Segurança e migração de dados
 
-- Cada registro possui **owner_id**; políticas RLS limitam leitura, criação, edição e exclusão ao proprietário.
+- Cada registro possui **owner_id**; as tabelas privadas continuam limitadas ao proprietário. O recurso social usa uma projeção separada, sem anotações nem datas pessoais, liberada somente ao próprio usuário e a quem ele segue.
 - Nunca coloque a chave **service_role** em variáveis **VITE_*** ou no navegador.
 - O script **supabase/auth-profiles-setup.sql** também remove `EXECUTE` público da função administrativa `rls_auto_enable()`; a função pública `is_kataru_username_available()` retorna somente um booleano e é necessária ao cadastro.
 - Registros de instalações antigas sem **owner_id** permanecem inacessíveis até serem atribuídos manualmente ao usuário correto. Faça backup antes da migração; não associe registros antigos automaticamente.
 - O modo local e o modo Supabase são armazenamentos separados. Importar dados do navegador para a nuvem ainda exige uma ferramenta de importação explícita.
-- As listas pessoais são privadas. A opção "Pública" é armazenada para uso futuro, mas não ativa compartilhamento público nesta versão.
+- As listas são visíveis ao proprietário e a contas que o seguem. O relacionamento é unidirecional: seguir alguém libera a biblioteca e as listas desse perfil; deixar de seguir retira o acesso.
 
 ## Catálogo
 

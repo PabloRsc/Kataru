@@ -67,6 +67,8 @@ Não execute essa migração em um banco vazio como substituto de **schema.sql**
 
 A pesquisa e atualização manual passam por funções serverless da Vercel (/api/anime). A fonte principal é a Jikan API; se ela falhar, o servidor consulta a AniList GraphQL como alternativa. Os dois provedores são normalizados para o formato usado pela coleção. Quando a Jikan não informa episódios de séries em lançamento, o Kataru tenta enriquecer a contagem com a AniList.
 
+A Biblioteca separa a coleção por formato (Séries TV, Filmes, OVAs, ONAs, Especiais e Música) e, por padrão, ordena do lançamento mais antigo ao mais recente. Títulos relacionados são agrupados quando o catálogo informa relações oficiais entre eles ou quando os títulos seguem um padrão reconhecível de temporadas/partes. A ordem usa a data exata quando disponível e o ano como alternativa quando o provedor não informa dia e mês. Ao adicionar um anime, o Kataru busca seus detalhes completos; para títulos já cadastrados, use “Atualizar dados do catálogo” na tela de detalhes para preencher datas e relações que ainda não existiam.
+
 A área Descobrir consulta títulos populares, mais bem avaliados e gêneros sob demanda. A Jikan é a fonte principal; se uma consulta falhar ou retornar uma lista vazia, a função serverless tenta a AniList GraphQL como alternativa. A categoria de mais bem avaliados também aplica a ordenação por nota na fonte alternativa. Os títulos encontrados permanecem apenas no catálogo externo e só entram em anime_collection quando o usuário escolhe adicioná-los à biblioteca. No desenvolvimento local, o Vite encaminha as rotas de catálogo para a Jikan.
 
 ## Build

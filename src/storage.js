@@ -121,6 +121,22 @@ export async function searchKataruProfiles(query, limit = 20) {
   return data || [];
 }
 
+export async function updateKataruProfile(profile) {
+  const user = await requireUser();
+  const payload = {
+    display_name: String(profile.display_name || '').trim().slice(0, 50),
+    bio: String(profile.bio || '').trim().slice(0, 160),
+    updated_at: new Date().toISOString()
+  };
+  const { data, error } = await supabase.from('kataru_profiles')
+    .update(payload)
+    .eq('user_id', user.id)
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function getKataruProfile(userId) {
   await requireUser();
   const { data, error } = await supabase.from('kataru_profiles')

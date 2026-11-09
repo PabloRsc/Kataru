@@ -340,6 +340,7 @@ export default function App() {
   const [communityTargetProfile, setCommunityTargetProfile] = useState(null);
   const [communitySearchInitialQuery, setCommunitySearchInitialQuery] = useState('');
   const [communityReturnPage, setCommunityReturnPage] = useState('home');
+  const [communityReturnProfile, setCommunityReturnProfile] = useState(null);
   const profileRef = useRef(null);
 
   useEffect(() => {
@@ -1016,6 +1017,7 @@ export default function App() {
         <div className="topbar-actions">
           <button className="global-search" aria-label="Buscar usuários" onClick={() => {
             setCommunityReturnPage(page);
+            setCommunityReturnProfile(page === 'community' ? communityTargetProfile : null);
             setCommunitySearchInitialQuery('');
             setCommunityOpen(true);
             setCommunitySearchRequest(value => value + 1);
@@ -1044,6 +1046,7 @@ export default function App() {
               {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={() => {
                 setProfileOpen(false);
                 setCommunityReturnPage(page);
+                setCommunityReturnProfile(page === 'community' ? communityTargetProfile : null);
                 setCommunityTargetProfile(null);
                 navigate('community');
                 setCommunityProfileRequest(value => value + 1);
@@ -1164,7 +1167,7 @@ export default function App() {
             openMyProfileSignal={communityProfileRequest}
             acknowledgeMyProfileRequest={setCommunityProfileRequest}
             onBackToSearch={query => {
-              setCommunityTargetProfile(null);
+              setCommunityTargetProfile(communityReturnProfile);
               setPage(communityReturnPage || 'home');
               setCommunitySearchInitialQuery(query || '');
               setCommunityOpen(true);
@@ -1877,7 +1880,7 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
 }
 
 function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery || '');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [profileStats, setProfileStats] = useState({ followers: 0, following: 0 });

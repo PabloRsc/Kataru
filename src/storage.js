@@ -177,6 +177,24 @@ export async function unfollowKataruUser(userId) {
   return true;
 }
 
+export async function getKataruRelationProfiles(userId, relation = 'followers') {
+  await requireUser();
+  const isFollowers = relation === 'followers';
+  const { data: rows, error: relationError } = await supabase.from('kataru_follows')
+    .select('follower_id, followed_id')
+    .eq(isFollowers ? 'followed_id' : 'follower_id', userId)
+    .order('created_at', { ascending: false });
+  if (relationError) throw relationError;
+  const ids = (rows || []).map(row => isFollowers ? row.follower_id : row.followed_id).filter(Boolean);
+  if (!ids.length) return [];
+  const { data: profiles, error } = await supabase.from('kataru_profiles')
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .in('user_id', ids);
+  if (error) throw error;
+  const byId = new Map((profiles || []).map(profile => [profile.user_id, profile]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+
 export async function getFollowingKataruProfiles() {
   const user = await requireUser();
   const { data: follows, error: followError } = await supabase.from('kataru_follows')

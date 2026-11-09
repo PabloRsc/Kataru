@@ -169,11 +169,11 @@ const formatReleaseLabel = anime => {
   return anime?.year ? String(anime.year) : 'Data não informada';
 };
 const normalizeFranchiseTitle = value => normalizeAnimeTitle(value)
-  .replace(/\\b(?:\\d+(?:st|nd|rd|th)|second|third|fourth|fifth|final) season\\b/g, ' ')
-  .replace(/\\bseason\\s+(?:\\d+|[ivx]+)\\b/g, ' ')
-  .replace(/\\b(?:part|cour)\\s+(?:\\d+|one|two|three|four|[ivx]+)\\b/g, ' ')
-  .replace(/\\b(?:the )?final season\\b/g, ' ')
-  .replace(/\\s+/g, ' ')
+  .replace(/\b(?:\d+(?:st|nd|rd|th)|second|third|fourth|fifth|final) season\b/g, ' ')
+  .replace(/\bseason\s+(?:\d+|[ivx]+)\b/g, ' ')
+  .replace(/\b(?:part|cour)\s+(?:\d+|one|two|three|four|[ivx]+)\b/g, ' ')
+  .replace(/\b(?:the )?final season\b/g, ' ')
+  .replace(/\s+/g, ' ')
   .trim();
 const franchiseKeys = anime => getAnimeAliases(anime)
   .map(normalizeFranchiseTitle)

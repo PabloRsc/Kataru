@@ -2301,3 +2301,81 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .avatar-crop-viewport { width: min(76vw, 360px); }
   .avatar-crop-controls { width: min(82vw, 380px); }
 }
+
+
+/* Explicit "don't remember episode" state for paused and dropped anime */
+.episode-unknown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  background: #8B7CFF0C;
+  border: 1px solid #8B7CFF3D;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.episode-unknown-toggle input {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  margin: 0;
+  accent-color: var(--purple);
+}
+.episode-unknown-toggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.episode-unknown-toggle strong {
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 650;
+}
+.episode-unknown-toggle small {
+  color: var(--muted-2);
+  font-size: 8px;
+  line-height: 1.45;
+}
+.episode-unknown-detail {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+}
+.episode-unknown-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  color: #BDB3FF;
+  background: #8B7CFF18;
+  border: 1px solid #8B7CFF3B;
+  border-radius: 12px;
+}
+.episode-unknown-detail > div:last-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+.episode-unknown-detail strong {
+  color: var(--text);
+  font: 650 12px 'Outfit',sans-serif;
+}
+.episode-unknown-detail p {
+  margin: 0;
+  color: var(--muted-2);
+  font-size: 9px;
+}
+.episode-unknown-detail .text-button {
+  margin-top: 2px;
+  padding: 0;
+  font-size: 9px;
+}
+.row-progress.is-unknown {
+  color: var(--muted-2);
+  font-size: 8px;
+}
+.row-progress.is-unknown i { display: none; }

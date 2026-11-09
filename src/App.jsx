@@ -512,7 +512,8 @@ export default function App() {
           id: anime.id,
           status: anime.status,
           episode_current: anime.episode_current,
-            episode_unknown: Boolean(anime.episode_unknown),          rating_personal: anime.rating_personal,
+            episode_unknown: Boolean(anime.episode_unknown),
+            rating_personal: anime.rating_personal,
           rewatch_count: anime.rewatch_count,
           started_at: anime.started_at,
           completed_at: anime.completed_at,
@@ -629,7 +630,7 @@ export default function App() {
       status: anime.status || 'planned',
       episode_current: anime.episode_current ?? 0,
       episode_unknown: Boolean(anime.episode_unknown),
-      rating_personal: anime.rating_personal ?? '',
+            rating_personal: anime.rating_personal ?? '',
       rewatch_count: anime.rewatch_count ?? 0,
       started_at: anime.started_at || '',
       completed_at: anime.completed_at || '',
@@ -662,7 +663,8 @@ export default function App() {
             mal_id: editor.mal_id,
             status: editor.status,
             episode_current: editor.episode_current,
-            episode_unknown: Boolean(editor.episode_unknown),            rating_personal: editor.rating_personal,
+            episode_unknown: Boolean(editor.episode_unknown),
+            rating_personal: editor.rating_personal,
             rewatch_count: editor.rewatch_count,
             started_at: editor.started_at,
             completed_at: editor.completed_at,
@@ -761,7 +763,8 @@ export default function App() {
         created_at: current.created_at,
         status: current.status,
         episode_current: current.episode_current,
-            episode_unknown: Boolean(current.episode_unknown),        rating_personal: current.rating_personal,
+            episode_unknown: Boolean(current.episode_unknown),
+            rating_personal: current.rating_personal,
         notes: current.notes,
         rewatch_count: current.rewatch_count,
         started_at: current.started_at,
@@ -835,7 +838,8 @@ export default function App() {
         id: anime.id,
         status: anime.status,
         episode_current: anime.episode_current,
-            episode_unknown: Boolean(anime.episode_unknown),        rating_personal: anime.rating_personal,
+            episode_unknown: Boolean(anime.episode_unknown),
+            rating_personal: anime.rating_personal,
         notes: anime.notes,
         display_title: anime.display_title,
         episodes_total_manual: anime.episodes_total_manual,
@@ -874,7 +878,8 @@ export default function App() {
             id: anime.id,
             status: anime.status,
             episode_current: anime.episode_current,
-            episode_unknown: Boolean(anime.episode_unknown),            rating_personal: anime.rating_personal,
+            episode_unknown: Boolean(anime.episode_unknown),
+            rating_personal: anime.rating_personal,
             notes: anime.notes,
             display_title: anime.display_title,
             episodes_total_manual: anime.episodes_total_manual,
@@ -1444,7 +1449,7 @@ function PosterCard({ anime, onClick, compact = false }) {
         {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <div className="poster-fallback"><Clapperboard size={25} /></div>}
         <span className={'status-pill tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
         {anime.format && <span className="poster-format-pill">{localizedFormat(anime.format)}</span>}
-        {anime.status !== 'watching' && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
+        {!['watching', 'paused'].includes(anime.status) && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
         {anime.status === 'watching' && <>
           <span className={total ? 'poster-progress' : 'poster-progress is-indeterminate'}><i style={{ width: (total ? progress : 34) + '%' }} /></span>
           <span className="poster-episode-count">EP. {Number(anime.episode_current || 0)}{total ? ' / ' + total : ''}</span>
@@ -1539,8 +1544,8 @@ function AnimeRow({ anime, onClick }) {
       {anime.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <div className="row-fallback"><Clapperboard size={20} /></div>}
       <span className="row-title"><strong>{displayTitle(anime)}</strong><small>{formatReleaseLabel(anime)} · {localizedFormat(anime.format)}</small></span>
       <span className={'row-status tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
-      <span className={!total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}<i><b style={{ width: (total ? pct : 34) + '%' }} /></i></span>
-      <span className="row-rating">{anime.status !== 'watching' && anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
+      <span className={anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'row-progress is-unknown' : !total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'Episódio não lembrado' : total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}{!(anime.episode_unknown && ['paused', 'dropped'].includes(anime.status)) && <i><b style={{ width: (total ? pct : 34) + '%' }} /></i>}</span>
+      <span className="row-rating">{!['watching', 'paused'].includes(anime.status) && anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
       <ChevronRight size={16} className="row-chevron" />
     </button>
   );

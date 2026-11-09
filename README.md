@@ -46,7 +46,7 @@ A tela de conta inclui cadastro com nome de usuário único, login por e-mail/se
 
 **Recuperação e confirmação:** em Authentication → URL Configuration, autorize o domínio publicado, os previews usados para testes e o endereço local (http://localhost:5173). O link de recuperação retorna à raiz do Kataru para que o Supabase entregue o evento de redefinição de senha.
 
-Os links de Termos e Privacidade estão previstos no formulário; os destinos e textos jurídicos finais ainda precisam ser fornecidos antes da publicação comercial.
+As páginas **public/termos.html** e **public/privacidade.html** já estão ligadas ao cadastro. Elas são minutas de beta, marcadas como versão de revisão e com campos pendentes (responsável legal, contato, retenção, exclusão, idade mínima, bases legais e transferências internacionais). Não trate esses textos como políticas jurídicas finais nem faça lançamento público definitivo antes de completar e validar essas informações.
 
 ### Atualizar uma instalação Supabase existente
 
@@ -58,6 +58,7 @@ Não execute essa migração em um banco vazio como substituto de **schema.sql**
 
 - Cada registro possui **owner_id**; políticas RLS limitam leitura, criação, edição e exclusão ao proprietário.
 - Nunca coloque a chave **service_role** em variáveis **VITE_*** ou no navegador.
+- O script **supabase/auth-profiles-setup.sql** também remove `EXECUTE` público da função administrativa `rls_auto_enable()`; a função pública `is_kataru_username_available()` retorna somente um booleano e é necessária ao cadastro.
 - Registros de instalações antigas sem **owner_id** permanecem inacessíveis até serem atribuídos manualmente ao usuário correto. Faça backup antes da migração; não associe registros antigos automaticamente.
 - O modo local e o modo Supabase são armazenamentos separados. Importar dados do navegador para a nuvem ainda exige uma ferramenta de importação explícita.
 - As listas pessoais são privadas. A opção "Pública" é armazenada para uso futuro, mas não ativa compartilhamento público nesta versão.

@@ -1974,9 +1974,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .social-community-modal .loading-block { min-height: 90px; }
 .community-profile-page {
-  width: min(1180px, calc(100% - 9vw));
-  margin: 0 auto;
-  padding: 38px 0 72px;
+  width: 100%;
+  margin: 0;
+  padding: 0 0 24px;
 }
 .community-profile-page .social-profile-hero { margin-top: 0; }
 @media (max-width: 680px) {
@@ -1994,8 +1994,5 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .social-community-modal-header h2 { font-size: 20px; }
   .social-community-modal .social-search-field { height: 46px; }
   .social-community-modal .social-discover-empty { min-height: 82px; }
-  .community-profile-page {
-    width: calc(100% - 32px);
-    padding: 25px 0 58px;
-  }
+  .community-profile-page { width: 100%; padding-bottom: 18px; }
 }

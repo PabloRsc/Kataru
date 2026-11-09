@@ -271,6 +271,9 @@
 .auth-back-link { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 26px; color: #A3A9BA; }
 .auth-privacy-note { margin: 16px 0 0; color: #7F879A; font-size: 10px; line-height: 1.55; }
 .auth-right-footer { display: flex; justify-content: space-between; gap: 15px; width: min(440px,100%); margin-top: 17px; color: rgba(163,169,186,.65); font-size: 9px; }
+.auth-legal-footer-links { display: inline-flex; align-items: center; gap: 10px; }
+.auth-legal-footer-links a { color: inherit; text-decoration: none; }
+.auth-legal-footer-links a:hover { color: #C5B9FF; }
 .auth-config-card { width: min(450px,calc(100% - 36px)); padding: 30px; border: 1px solid #2A2E3D; border-radius: 22px; background: rgba(18,20,30,.8); }
 .auth-config-card h1 { font: 700 25px 'Outfit',sans-serif; }
 .auth-config-card p { color: #A3A9BA; font-size: 13px; line-height: 1.6; }

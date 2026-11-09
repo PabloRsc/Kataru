@@ -16,6 +16,10 @@ const MEDIA_FIELDS = `
   format
   startDate { year month day }
   endDate { year month day }
+  nextAiringEpisode { episode airingAt }
+`;
+
+const DETAIL_RELATIONS_FIELDS = `
   relations {
     edges {
       relationType(version: 2)
@@ -28,7 +32,6 @@ const MEDIA_FIELDS = `
       }
     }
   }
-  nextAiringEpisode { episode airingAt }
 `;
 
 async function queryAniList(query, variables) {
@@ -69,7 +72,7 @@ export async function searchAniList(query) {
 
 export async function fetchAniListByMalId(malId) {
   const gql = `query ($malId: Int) {
-    Media(idMal: $malId, type: ANIME) { ${MEDIA_FIELDS} }
+    Media(idMal: $malId, type: ANIME) { ${MEDIA_FIELDS} ${DETAIL_RELATIONS_FIELDS} }
   }`;
   const data = await queryAniList(gql, { malId: Number(malId) });
   if (!data.Media) throw new Error('Anime não encontrado na fonte alternativa.');
@@ -77,10 +80,10 @@ export async function fetchAniListByMalId(malId) {
 }
 
 const dateFromAniList = value => {
-  if (!value?.year) return null;
+  if (!value?.year || !value?.month || !value?.day) return null;
   const year = String(value.year);
-  const month = String(value.month || 1).padStart(2, '0');
-  const day = String(value.day || 1).padStart(2, '0');
+  const month = String(value.month).padStart(2, '0');
+  const day = String(value.day).padStart(2, '0');
   return year + '-' + month + '-' + day;
 };
 
@@ -105,7 +108,7 @@ export function toJikanShape(item) {
     episodes: item.episodes ?? null,
     episodes_available: episodesAvailable,
     status: item.status || null,
-    type: ({ MOVIE: 'Movie', TV_SHORT: 'TV' }[item.format] || item.format || ''),
+    type: ({ TV: 'TV', MOVIE: 'Movie', OVA: 'OVA', ONA: 'ONA', SPECIAL: 'Special', MUSIC: 'Music', TV_SHORT: 'TV' }[item.format] || item.format || ''),
     aired: {
       from: { date: dateFromAniList(item.startDate), prop: { from: { year: item.startDate?.year || null } } },
       to: { date: dateFromAniList(item.endDate), prop: { to: { year: item.endDate?.year || null } } }

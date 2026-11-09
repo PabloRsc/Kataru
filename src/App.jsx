@@ -141,7 +141,7 @@ const statusLabel = id => STATUSES.find(status => status.id === id)?.label || 'Q
 const statusTone = id => STATUSES.find(status => status.id === id)?.tone || 'yellow';
 const sortByRecent = (a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
 const releaseDateOnly = value => {
-  const match = String(value || '').match(/^\\d{4}-\\d{2}-\\d{2}/);
+  const match = String(value || '').match(/^\d{4}-\d{2}-\d{2}/);
   return match ? match[0] : null;
 };
 const releaseTimestamp = anime => {

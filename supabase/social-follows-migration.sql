@@ -74,8 +74,8 @@ begin
   requested_display_name := coalesce(nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''), nullif(btrim(new.raw_user_meta_data ->> 'name'), ''), requested_username);
   requested_avatar := coalesce(nullif(btrim(new.raw_user_meta_data ->> 'avatar_url'), ''), nullif(btrim(new.raw_user_meta_data ->> 'picture'), ''));
 
-  insert into public.kataru_profiles (user_id, username, display_name, bio, avatar_url)
-  values (new.id, requested_username, requested_display_name, '', requested_avatar)
+  insert into public.kataru_profiles (user_id, username, display_name, bio, avatar_url, created_at)
+  values (new.id, requested_username, requested_display_name, '', requested_avatar, new.created_at)
   on conflict (user_id) do nothing;
   return new;
 end;

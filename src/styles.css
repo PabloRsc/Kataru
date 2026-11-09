@@ -2379,3 +2379,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 8px;
 }
 .row-progress.is-unknown i { display: none; }
+
+.social-shared-library-grid { width: 100%; margin-top: 2px; }
+.social-shared-library-grid .poster-card { min-width: 0; }

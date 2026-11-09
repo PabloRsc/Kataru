@@ -11,7 +11,7 @@ import { discoverAnime, fetchAnime, fetchAnimeGenres, searchAnime } from './api'
 import {
   createAnimeList, deleteAnime, deleteAnimeList, getAnimeList, getAnimeLists,
   getCurrentKataruProfile, getFollowedKataruAnime, getFollowedKataruLists,
-  getFollowingKataruProfiles, getKataruProfile, getKataruRelationProfiles,
+  getKataruProfile, getKataruRelationProfiles,
   getKataruSocialStats, isFollowingKataruUser, searchKataruProfiles,
   followKataruUser, unfollowKataruUser, updateKataruProfile, saveAnime, saveAnimeList, storageMode, supabase
 } from './storage';
@@ -335,6 +335,7 @@ export default function App() {
   const [authUser, setAuthUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [communityProfileRequest, setCommunityProfileRequest] = useState(0);
+  const [communitySearchRequest, setCommunitySearchRequest] = useState(0);
   const profileRef = useRef(null);
 
   useEffect(() => {
@@ -1007,12 +1008,12 @@ export default function App() {
           <button className={page === 'library' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('library')}>Biblioteca</button>
           <button className={page === 'discover' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('discover')}>Descobrir</button>
           <button className={page === 'lists' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('lists')}>Listas</button>
-          <button className={page === 'community' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('community')}>Pessoas</button>
-        </nav>
+                  </nav>
         <div className="topbar-actions">
-          <button className="global-search" aria-label="Buscar animes e estúdios" onClick={() => {
-            setSearchMode('global'); setSearchOpen(true); setSearchQuery(''); setResults([]);
-          }}><Search size={16} /><span>Buscar animes, estúdios...</span></button>
+          <button className="global-search" aria-label="Buscar usuários" onClick={() => {
+            setCommunitySearchRequest(value => value + 1);
+            navigate('community');
+          }}><Search size={16} /><span>Buscar usuários...</span></button>
           <button className="primary-button top-add" onClick={() => {
             setSearchMode('add'); setSearchOpen(true); setSearchQuery(''); setResults([]);
           }}><Plus size={16} />Adicionar anime</button>
@@ -1143,7 +1144,7 @@ export default function App() {
             isInCollection={isInCollection}
           />
         ) : page === 'community' ? (
-          <CommunityPage currentUserId={authUser?.id} openMyProfileSignal={communityProfileRequest} acknowledgeMyProfileRequest={setCommunityProfileRequest} />
+          <CommunityPage currentUserId={authUser?.id} openMyProfileSignal={communityProfileRequest} acknowledgeMyProfileRequest={setCommunityProfileRequest} focusSearchSignal={communitySearchRequest} acknowledgeSearchRequest={setCommunitySearchRequest} />
         ) : (
           <ListsPage
             items={items}
@@ -1173,7 +1174,7 @@ export default function App() {
         <button className="mobile-nav-add" onClick={() => setSearchOpen(true)}><Plus size={21} /></button>
         <button className={page === 'discover' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('discover')}><Compass size={19} /><span>Descobrir</span></button>
         <button className={page === 'lists' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('lists')}><List size={19} /><span>Listas</span></button>
-        <button className={page === 'community' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('community')}><Users size={19} /><span>Pessoas</span></button>
+        <button className={page === 'community' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => { setCommunitySearchRequest(value => value + 1); navigate('community'); }}><Search size={19} /><span>Pesquisar</span></button>
       </nav>
 
       {searchOpen && (
@@ -1832,11 +1833,9 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
   );
 }
 
-function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyProfileRequest }) {
-  const [tab, setTab] = useState('discover');
+function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [followingProfiles, setFollowingProfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [profileStats, setProfileStats] = useState({ followers: 0, following: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
@@ -1854,19 +1853,19 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
   const [profileForm, setProfileForm] = useState({ display_name: '', bio: '' });
   const [savingProfile, setSavingProfile] = useState(false);
   const [notice, setNotice] = useState('');
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
-    let active = true;
-    getFollowingKataruProfiles()
-      .then(profiles => { if (active) setFollowingProfiles(profiles); })
-      .catch(loadError => { if (active) setError(loadError.message || 'Não foi possível carregar quem você segue.'); });
-    return () => { active = false; };
-  }, []);
+    if (focusSearchSignal > 0) {
+      acknowledgeSearchRequest?.(0);
+      searchInputRef.current?.focus();
+    }
+  }, [focusSearchSignal, acknowledgeSearchRequest]);
 
   useEffect(() => {
     let active = true;
     const term = query.trim();
-    if (tab !== 'discover' || term.length < 2) {
+    if (term.length < 2) {
       setSearchResults([]);
       return undefined;
     }
@@ -1882,7 +1881,7 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
       active = false;
       window.clearTimeout(timer);
     };
-  }, [query, tab]);
+  }, [query]);
 
   async function loadProfileContent(userId) {
     setContentLoading(true);
@@ -1974,7 +1973,6 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
         setProfileAnime([]);
         setProfileLists([]);
         setProfileStats(current => ({ ...current, followers: Math.max(0, current.followers - 1) }));
-        setFollowingProfiles(current => current.filter(profile => profile.user_id !== selectedProfile.user_id));
         setNotice('Você deixou de seguir @' + selectedProfile.username + '.');
       } else {
         await followKataruUser(selectedProfile.user_id);
@@ -1982,9 +1980,6 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
         setProfileStats(current => ({ ...current, followers: current.followers + 1 }));
         setNotice('Agora você está seguindo @' + selectedProfile.username + '.');
         await loadProfileContent(selectedProfile.user_id);
-        setFollowingProfiles(current => current.some(profile => profile.user_id === selectedProfile.user_id)
-          ? current
-          : [selectedProfile, ...current]);
       }
     } catch (followError) {
       setError(followError.message || 'Não foi possível atualizar o relacionamento.');
@@ -2026,7 +2021,7 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
     }
   }
 
-  function returnToPeople() {
+  function returnToUserSearch() {
     setSelectedProfile(null);
     setSelectedList(null);
     setConnectionsType(null);
@@ -2066,7 +2061,7 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
 
     return (
       <div className="community-page">
-        <button className="back-link" onClick={selectedList ? () => setSelectedList(null) : connectionsType ? () => setConnectionsType(null) : returnToPeople}>
+        <button className="back-link" onClick={selectedList ? () => setSelectedList(null) : connectionsType ? () => setConnectionsType(null) : returnToUserSearch}>
           <ChevronLeft size={16} />{selectedList ? 'Voltar às listas' : connectionsType ? 'Voltar ao perfil' : 'Voltar para pessoas'}
         </button>
         {selectedList ? (
@@ -2151,33 +2146,19 @@ function CommunityPage({ currentUserId, openMyProfileSignal = 0, acknowledgeMyPr
     <div className="community-page">
       <PageIntro
         eyebrow="COMUNIDADE KATARU"
-        title="Pessoas"
-        subtitle="Encontre outros fãs, siga perfis e acompanhe suas bibliotecas e listas."
+        title="Buscar usuários"
+        subtitle="Encontre pessoas pelo nome ou @usuário para acompanhar suas bibliotecas e listas."
         action={<button className="outline-button" onClick={openMyProfile}><UserRound size={15} />Meu perfil</button>}
       />
-      <div className="community-tabs">
-        <button className={tab === 'discover' ? 'active' : ''} onClick={() => setTab('discover')}><Search size={15} />Encontrar pessoas</button>
-        <button className={tab === 'following' ? 'active' : ''} onClick={() => setTab('following')}><Users size={15} />Seguindo <span>{followingProfiles.length}</span></button>
-      </div>
-      {tab === 'discover' ? (
-        <>
-          <label className="social-search-field"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar por nome de usuário (ex.: pedro)" /><kbd>⌕</kbd></label>
-          <p className="social-search-note">Digite pelo menos 2 caracteres do @usuário para encontrar pessoas.</p>
-          {error && <div className="social-error">{error}</div>}
-          {loading ? <div className="loading-block"><LoaderCircle className="spin" />Buscando pessoas...</div> : query.trim().length >= 2 ? searchResults.length ? (
-            <div className="social-user-grid">
-              {searchResults.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} hint="Toque para ver o perfil" />)}
-            </div>
-          ) : <div className="social-empty"><Users size={23} /><strong>Nenhum usuário encontrado</strong><span>Confira a grafia do nome de usuário.</span></div> : (
-            <div className="social-discover-empty"><Users size={25} /><strong>Conheça outros fãs de anime</strong><p>Pesquise por um nome de usuário para abrir o perfil e começar a seguir.</p></div>
-          )}
-        </>
-      ) : (
-        followingProfiles.length ? (
-          <div className="social-user-grid">
-            {followingProfiles.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} hint="Você está seguindo este perfil" />)}
-          </div>
-        ) : <div className="social-empty"><Users size={23} /><strong>Você ainda não segue ninguém</strong><span>Encontre pessoas e acompanhe suas bibliotecas e listas.</span><button className="primary-button" onClick={() => setTab('discover')}>Encontrar pessoas</button></div>
+      <label className="social-search-field"><Search size={17} /><input ref={searchInputRef} autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar por usuário ou nome de exibição..." /><kbd>⌕</kbd></label>
+      <p className="social-search-note">Pesquise pelo @usuário ou nome de exibição. Digite pelo menos 2 caracteres.</p>
+      {error && <div className="social-error">{error}</div>}
+      {loading ? <div className="loading-block"><LoaderCircle className="spin" />Buscando usuários...</div> : query.trim().length >= 2 ? searchResults.length ? (
+        <div className="social-user-grid">
+          {searchResults.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} hint="Abrir perfil" />)}
+        </div>
+      ) : <div className="social-empty"><Users size={23} /><strong>Nenhum usuário encontrado</strong><span>Confira o nome ou @usuário e tente novamente.</span></div> : (
+        <div className="social-discover-empty"><Users size={25} /><strong>Encontre pessoas no Kataru</strong><p>Digite um nome ou @usuário para abrir o perfil, seguir e acompanhar bibliotecas e listas.</p></div>
       )}
     </div>
   );

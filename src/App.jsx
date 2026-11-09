@@ -5,12 +5,15 @@ import {
   ChevronRight, Clapperboard, Clock3, Compass, Filter, Grid2X2, Heart, Home,
   Library, List, ListPlus, LoaderCircle, LogOut, MoreHorizontal, Pencil, Plus,
   Search, Settings2, SlidersHorizontal, Sparkles, Star, Trash2, Trophy, Tv,
-  X, Zap
+  UserRound, UserPlus, UserCheck, Users, X, Zap
 } from 'lucide-react';
 import { discoverAnime, fetchAnime, fetchAnimeGenres, searchAnime } from './api';
 import {
   createAnimeList, deleteAnime, deleteAnimeList, getAnimeList, getAnimeLists,
-  saveAnime, saveAnimeList, storageMode, supabase
+  getCurrentKataruProfile, getFollowedKataruAnime, getFollowedKataruLists,
+  getFollowingKataruProfiles, getKataruProfile, getKataruRelationProfiles,
+  getKataruSocialStats, isFollowingKataruUser, searchKataruProfiles,
+  followKataruUser, unfollowKataruUser, saveAnime, saveAnimeList, storageMode, supabase
 } from './storage';
 
 const STATUSES = [
@@ -1003,6 +1006,7 @@ export default function App() {
           <button className={page === 'library' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('library')}>Biblioteca</button>
           <button className={page === 'discover' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('discover')}>Descobrir</button>
           <button className={page === 'lists' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('lists')}>Listas</button>
+          <button className={page === 'community' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('community')}>Pessoas</button>
         </nav>
         <div className="topbar-actions">
           <button className="global-search" aria-label="Buscar animes e estúdios" onClick={() => {
@@ -1029,6 +1033,7 @@ export default function App() {
                 <strong>{authUser?.user_metadata?.username || authUser?.user_metadata?.username || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
                 <span>{authUser?.email || 'Seus dados ficam salvos neste navegador.'}</span>
               </div>
+              {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={() => { setProfileOpen(false); navigate('community'); }}><UserRound size={15} />Meu perfil</button>}
               {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={async () => {
                 setProfileOpen(false);
                 const { error } = await supabase.auth.signOut();
@@ -1136,6 +1141,8 @@ export default function App() {
             findInCollection={anime => items.find(item => String(item.mal_id) === String(anime.mal_id)) || null}
             isInCollection={isInCollection}
           />
+        ) : page === 'community' ? (
+          <CommunityPage currentUserId={authUser?.id} />
         ) : (
           <ListsPage
             items={items}
@@ -1165,6 +1172,7 @@ export default function App() {
         <button className="mobile-nav-add" onClick={() => setSearchOpen(true)}><Plus size={21} /></button>
         <button className={page === 'discover' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('discover')}><Compass size={19} /><span>Descobrir</span></button>
         <button className={page === 'lists' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('lists')}><List size={19} /><span>Listas</span></button>
+        <button className={page === 'community' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('community')}><Users size={19} /><span>Pessoas</span></button>
       </nav>
 
       {searchOpen && (

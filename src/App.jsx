@@ -334,6 +334,7 @@ export default function App() {
   const [pendingListId, setPendingListId] = useState(null);
   const [authUser, setAuthUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [communityProfileRequest, setCommunityProfileRequest] = useState(0);
   const profileRef = useRef(null);
 
   useEffect(() => {
@@ -1033,7 +1034,7 @@ export default function App() {
                 <strong>{authUser?.user_metadata?.username || authUser?.user_metadata?.username || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
                 <span>{authUser?.email || 'Seus dados ficam salvos neste navegador.'}</span>
               </div>
-              {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={() => { setProfileOpen(false); navigate('community'); }}><UserRound size={15} />Meu perfil</button>}
+              {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={() => { setProfileOpen(false); setCommunityProfileRequest(value => value + 1); navigate('community'); }}><UserRound size={15} />Meu perfil</button>}
               {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={async () => {
                 setProfileOpen(false);
                 const { error } = await supabase.auth.signOut();
@@ -1142,7 +1143,7 @@ export default function App() {
             isInCollection={isInCollection}
           />
         ) : page === 'community' ? (
-          <CommunityPage currentUserId={authUser?.id} />
+          <CommunityPage currentUserId={authUser?.id} openMyProfileSignal={communityProfileRequest} />
         ) : (
           <ListsPage
             items={items}
@@ -1831,7 +1832,7 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
   );
 }
 
-function CommunityPage({ currentUserId }) {
+function CommunityPage({ currentUserId, openMyProfileSignal = 0 }) {
   const [tab, setTab] = useState('discover');
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -1954,6 +1955,10 @@ function CommunityPage({ currentUserId }) {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (openMyProfileSignal > 0) openMyProfile();
+  }, [openMyProfileSignal]);
 
   async function toggleFollow() {
     if (!selectedProfile || selectedProfile.user_id === currentUserId || busy) return;

@@ -1607,6 +1607,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     background: #151720F5; border-top: 1px solid #34384A;
     backdrop-filter: blur(18px);
   }
+  .mobile-nav-item { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 48px; padding: 0; color: var(--muted-2); background: none; border: 0; font-size: 7px; font-weight: 650; }
+  .mobile-nav-item.active { color: #C9C1FF; }
+  .mobile-nav-item.active svg { color: var(--purple); }
+  .mobile-nav-add { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; color: #171420; background: var(--yellow); border: 4px solid #252635; border-radius: 15px; box-shadow: 0 3px 15px #FFC85735; }
   .library-format-tabs { gap: 6px; margin: 0 0 13px; }
   .library-format-tabs button { min-height: 32px; padding-inline: 9px; font-size: 8px; }
   .library-franchise { padding: 10px; border-radius: 10px; }

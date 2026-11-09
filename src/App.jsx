@@ -40,11 +40,23 @@ const DISCOVER_TABS = [
 ];
 
 const SORT_OPTIONS = [
+  { id: 'release', label: 'Lançamento (mais antigo)' },
+  { id: 'release-desc', label: 'Lançamento (mais recente)' },
   { id: 'updated', label: 'Atualizado recentemente' },
   { id: 'added', label: 'Adicionado recentemente' },
   { id: 'title', label: 'Título (A–Z)' },
   { id: 'rating', label: 'Maior nota pessoal' },
   { id: 'progress', label: 'Maior progresso' }
+];
+
+const FORMAT_FILTERS = [
+  { id: '', label: 'Todos' },
+  { id: 'TV', label: 'Séries TV' },
+  { id: 'Movie', label: 'Filmes' },
+  { id: 'OVA', label: 'OVAs' },
+  { id: 'ONA', label: 'ONAs' },
+  { id: 'Special', label: 'Especiais' },
+  { id: 'Music', label: 'Música' }
 ];
 
 const formatDate = value => {
@@ -128,6 +140,93 @@ const episodeProgressLimit = anime => isCurrentlyAiring(anime)
 const statusLabel = id => STATUSES.find(status => status.id === id)?.label || 'Quero assistir';
 const statusTone = id => STATUSES.find(status => status.id === id)?.tone || 'yellow';
 const sortByRecent = (a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
+const releaseTimestamp = anime => {
+  const exact = anime?.release_date ? Date.parse(anime.release_date + (String(anime.release_date).length === 10 ? 'T12:00:00' : '')) : NaN;
+  if (Number.isFinite(exact)) return exact;
+  const year = Number(anime?.year) || null;
+  return year ? Date.UTC(year, 0, 1) : null;
+};
+const compareReleaseDate = (a, b) => {
+  const left = releaseTimestamp(a);
+  const right = releaseTimestamp(b);
+  if (left == null && right == null) return displayTitle(a).localeCompare(displayTitle(b), 'pt-BR');
+  if (left == null) return 1;
+  if (right == null) return -1;
+  return left - right || displayTitle(a).localeCompare(displayTitle(b), 'pt-BR');
+};
+const formatReleaseLabel = anime => {
+  if (anime?.release_date) {
+    const date = new Date(anime.release_date + (String(anime.release_date).length === 10 ? 'T12:00:00' : ''));
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'UTC'
+      });
+    }
+  }
+  return anime?.year ? String(anime.year) : 'Data não informada';
+};
+const normalizeFranchiseTitle = value => normalizeAnimeTitle(value)
+  .replace(/\\b(?:\\d+(?:st|nd|rd|th)|second|third|fourth|fifth|final) season\\b/g, ' ')
+  .replace(/\\bseason\\s+(?:\\d+|[ivx]+)\\b/g, ' ')
+  .replace(/\\b(?:part|cour)\\s+(?:\\d+|one|two|three|four|[ivx]+)\\b/g, ' ')
+  .replace(/\\b(?:the )?final season\\b/g, ' ')
+  .replace(/\\s+/g, ' ')
+  .trim();
+const franchiseKeys = anime => getAnimeAliases(anime)
+  .map(normalizeFranchiseTitle)
+  .filter(key => key.split(' ').length >= 2 && key.length >= 8);
+
+function groupAnimeByFranchise(entries) {
+  const parent = new Map((entries || []).map(anime => [String(anime.mal_id), String(anime.mal_id)]));
+  const find = id => {
+    const current = parent.get(id);
+    if (!current) return null;
+    if (current === id) return id;
+    const root = find(current);
+    parent.set(id, root);
+    return root;
+  };
+  const unite = (left, right) => {
+    const a = find(left);
+    const b = find(right);
+    if (a && b && a !== b) parent.set(b, a);
+  };
+
+  const byFranchiseKey = new Map();
+  (entries || []).forEach(anime => {
+    const id = String(anime.mal_id);
+    (anime.related_anime || []).forEach(relation => {
+      const relatedId = String(relation.mal_id || '');
+      if (parent.has(relatedId)) unite(id, relatedId);
+    });
+    franchiseKeys(anime).forEach(key => {
+      if (byFranchiseKey.has(key)) unite(id, byFranchiseKey.get(key));
+      else byFranchiseKey.set(key, id);
+    });
+  });
+
+  const groups = new Map();
+  (entries || []).forEach(anime => {
+    const key = find(String(anime.mal_id)) || String(anime.mal_id);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(anime);
+  });
+
+  return [...groups.values()]
+    .map(group => {
+      const ordered = [...group].sort(compareReleaseDate);
+      const tvEntry = ordered.find(anime => String(anime.format || '').toUpperCase() === 'TV');
+      return {
+        key: String(ordered[0]?.mal_id || ''),
+        title: displayTitle(tvEntry || ordered[0]),
+        items: ordered
+      };
+    })
+    .sort((a, b) => compareReleaseDate(a.items[0], b.items[0]));
+};
 const getInitials = value => String(value || 'K').trim().slice(0, 1).toUpperCase();
 
 export default function App() {
@@ -138,7 +237,7 @@ export default function App() {
   const [activeList, setActiveList] = useState(null);
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState('updated');
+  const [sort, setSort] = useState('release');
   const [genreFilter, setGenreFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [formatFilter, setFormatFilter] = useState('');

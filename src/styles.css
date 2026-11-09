@@ -351,6 +351,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .star-rating button { display: grid; place-items: center; padding: 2px; color: #56596A; background: none; border: 0; }
 .star-rating button.filled { color: var(--yellow); }
 .star-rating button:hover { color: #FFE09A; transform: scale(1.08); }
+.star-rating-symbol {
+  position: relative;
+  display: inline-block;
+  width: 23px;
+  height: 23px;
+  line-height: 0;
+}
+.star-rating-symbol > svg { display: block; }
+.star-rating-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  height: 100%;
+  overflow: hidden;
+  color: currentColor;
+  pointer-events: none;
+}
+.star-rating-fill svg {
+  display: block;
+  width: 23px;
+  height: 23px;
+  max-width: none;
+  fill: currentColor;
+}
 .detail-notes-panel .detail-block-heading button { display: inline-flex; align-items: center; gap: 4px; color: var(--purple); background: none; border: 0; font-size: 8px; letter-spacing: 0; }
 .detail-notes-panel p { display: -webkit-box; overflow: hidden; margin: 0; color: var(--muted); font-size: 9px; line-height: 1.65; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .detail-info-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; margin-top: 14px; background: var(--line); border: 1px solid var(--line); border-radius: 9px; }
@@ -2200,7 +2225,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   box-shadow: 0 0 0 1px #0008, 0 8px 32px #0008;
   cursor: grab;
   touch-action: none;
+  overscroll-behavior: contain;
   user-select: none;
+}
+.avatar-crop-viewport:focus-visible {
+  outline: 2px solid #BDB3FF;
+  outline-offset: 5px;
 }
 .avatar-crop-viewport.is-dragging { cursor: grabbing; }
 .avatar-crop-viewport img {

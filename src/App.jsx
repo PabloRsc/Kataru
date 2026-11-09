@@ -1883,7 +1883,7 @@ function SocialUserCard({ profile, onOpen, action, hint }) {
 function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, onActiveProfileChange, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
   const [query, setQuery] = useState(initialQuery || '');
   const [searchResults, setSearchResults] = useState([]);
-  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [selectedProfile, setSelectedProfile] = useState(() => (pageMode ? initialProfile : null));
   const [profileStats, setProfileStats] = useState({ followers: 0, following: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
   const [profileAnime, setProfileAnime] = useState([]);
@@ -2134,7 +2134,25 @@ function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackT
   }
 
   if (!open) return null;
-  if (pageMode && !selectedProfile) return <div className="community-page"><div className="loading-block"><LoaderCircle className="spin" />Carregando perfil...</div></div>;
+  if (pageMode && !selectedProfile) {
+    return (
+      <div className="community-page community-profile-page">
+        {loading ? (
+          <div className="loading-block"><LoaderCircle className="spin" />Carregando perfil...</div>
+        ) : (
+          <div className="social-profile-load-error">
+            <div className="empty-state-icon"><UserRound size={23} /></div>
+            <h2>Não foi possível abrir este perfil</h2>
+            <p>{error || 'O perfil não foi encontrado ou não está disponível no momento.'}</p>
+            <div className="empty-actions">
+              <button className="outline-button" onClick={returnToUserSearch}><Search size={14} />Voltar à busca</button>
+              <button className="primary-button" onClick={() => openMyProfile()}><UserRound size={14} />Tentar novamente</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const modalTitle = selectedProfile
     ? (selectedProfile.display_name || selectedProfile.username)

@@ -5,12 +5,16 @@ import {
   ChevronRight, Clapperboard, Clock3, Compass, Filter, Grid2X2, Heart, Home,
   Library, List, ListPlus, LoaderCircle, LogOut, MoreHorizontal, Pencil, Plus,
   Search, Settings2, SlidersHorizontal, Sparkles, Star, Trash2, Trophy, Tv,
-  X, Zap
+  UserRound, UserPlus, UserCheck, Users, X, Zap
 } from 'lucide-react';
 import { discoverAnime, fetchAnime, fetchAnimeGenres, searchAnime } from './api';
 import {
   createAnimeList, deleteAnime, deleteAnimeList, getAnimeList, getAnimeLists,
-  saveAnime, saveAnimeList, storageMode, supabase
+  getCurrentKataruProfile, getFollowedKataruAnime, getFollowedKataruLists,
+  getKataruProfile, getKataruRelationProfiles,
+  getKataruSocialStats, isFollowingKataruUser, isKataruUsernameAvailable, searchKataruProfiles,
+  followKataruUser, unfollowKataruUser, updateKataruProfile, uploadKataruAvatar, removeKataruAvatar,
+  getKataruAvatarPath, saveAnime, saveAnimeList, storageMode, supabase
 } from './storage';
 
 const STATUSES = [
@@ -24,6 +28,7 @@ const STATUSES = [
 const EMPTY_FORM = {
   status: 'planned',
   episode_current: 0,
+  episode_unknown: false,
   rating_personal: '',
   rewatch_count: 0,
   started_at: '',
@@ -279,6 +284,7 @@ function groupAnimeByFranchise(entries, sortMode = 'release', relationEntries = 
     });
 };
 const getInitials = value => String(value || 'K').trim().slice(0, 1).toUpperCase();
+const KATARU_USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
 export default function App() {
   const [items, setItems] = useState([]);
@@ -331,6 +337,13 @@ export default function App() {
   const [pendingListId, setPendingListId] = useState(null);
   const [authUser, setAuthUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [communityOpen, setCommunityOpen] = useState(false);
+  const [communityProfileRequest, setCommunityProfileRequest] = useState(0);
+  const [communitySearchRequest, setCommunitySearchRequest] = useState(0);
+  const [communityTargetProfile, setCommunityTargetProfile] = useState(null);
+  const [communitySearchInitialQuery, setCommunitySearchInitialQuery] = useState('');
+  const [communityReturnPage, setCommunityReturnPage] = useState('home');
+  const [communityReturnProfile, setCommunityReturnProfile] = useState(null);
   const profileRef = useRef(null);
 
   useEffect(() => {
@@ -499,7 +512,8 @@ export default function App() {
           id: anime.id,
           status: anime.status,
           episode_current: anime.episode_current,
-          rating_personal: anime.rating_personal,
+            episode_unknown: Boolean(anime.episode_unknown),
+            rating_personal: anime.rating_personal,
           rewatch_count: anime.rewatch_count,
           started_at: anime.started_at,
           completed_at: anime.completed_at,
@@ -615,7 +629,8 @@ export default function App() {
     setForm({
       status: anime.status || 'planned',
       episode_current: anime.episode_current ?? 0,
-      rating_personal: anime.rating_personal ?? '',
+      episode_unknown: Boolean(anime.episode_unknown),
+            rating_personal: anime.rating_personal ?? '',
       rewatch_count: anime.rewatch_count ?? 0,
       started_at: anime.started_at || '',
       completed_at: anime.completed_at || '',
@@ -648,6 +663,7 @@ export default function App() {
             mal_id: editor.mal_id,
             status: editor.status,
             episode_current: editor.episode_current,
+            episode_unknown: Boolean(editor.episode_unknown),
             rating_personal: editor.rating_personal,
             rewatch_count: editor.rewatch_count,
             started_at: editor.started_at,
@@ -669,9 +685,11 @@ export default function App() {
         mal_id: Number(catalogEditor.mal_id),
         title: form.is_manual ? form.title.trim() : (catalogEditor.title || form.title),
         episode_current: form.status === 'planned' ? 0
+          : form.episode_unknown && ['paused', 'dropped'].includes(form.status) ? 0
           : form.status === 'completed' ? completedCount
           : Math.max(0, Number(form.episode_current || 0)),
-        rating_personal: form.rating_personal === '' ? null : Number(form.rating_personal),
+        episode_unknown: ['paused', 'dropped'].includes(form.status) && Boolean(form.episode_unknown),
+        rating_personal: form.status === 'paused' || form.rating_personal === '' ? null : Number(form.rating_personal),
         rewatch_count: form.status === 'completed' ? Math.max(0, Number(form.rewatch_count || 0)) : Number(editor.rewatch_count || 0),
         started_at: form.status === 'watching' ? (form.started_at || new Date().toISOString().slice(0, 10)) : editor.started_at || null,
         completed_at: form.status === 'completed' ? (form.completed_at || new Date().toISOString().slice(0, 10)) : null,
@@ -722,7 +740,7 @@ export default function App() {
       notify('Você já chegou ao último episódio disponível informado pelo catálogo.');
       return;
     }
-    let updated = { ...anime, episode_current: next };
+    let updated = { ...anime, episode_current: next, episode_unknown: false };
     if (total && next >= total) {
       updated.status = 'completed';
       updated.completed_at = updated.completed_at || new Date().toISOString().slice(0, 10);
@@ -745,7 +763,8 @@ export default function App() {
         created_at: current.created_at,
         status: current.status,
         episode_current: current.episode_current,
-        rating_personal: current.rating_personal,
+            episode_unknown: Boolean(current.episode_unknown),
+            rating_personal: current.rating_personal,
         notes: current.notes,
         rewatch_count: current.rewatch_count,
         started_at: current.started_at,
@@ -765,7 +784,16 @@ export default function App() {
   }
 
   async function changeStatus(anime, status) {
-    const updated = { ...anime, status };
+    const keepsUnknownEpisode = ['paused', 'dropped'].includes(status)
+      && ['paused', 'dropped'].includes(anime.status)
+      && Boolean(anime.episode_unknown);
+    const updated = {
+      ...anime,
+      status,
+      episode_unknown: keepsUnknownEpisode,
+      rating_personal: status === 'paused' ? null : anime.rating_personal
+    };
+    if (keepsUnknownEpisode) updated.episode_current = 0;
     if (status === 'planned') {
       updated.episode_current = 0;
       updated.completed_at = null;
@@ -781,6 +809,7 @@ export default function App() {
   }
 
   async function changeRating(anime, stars) {
+    if (anime.status === 'paused') return null;
     return persistAnime({ ...anime, rating_personal: stars ? stars * 2 : null }, 'Nota atualizada.');
   }
 
@@ -809,7 +838,8 @@ export default function App() {
         id: anime.id,
         status: anime.status,
         episode_current: anime.episode_current,
-        rating_personal: anime.rating_personal,
+            episode_unknown: Boolean(anime.episode_unknown),
+            rating_personal: anime.rating_personal,
         notes: anime.notes,
         display_title: anime.display_title,
         episodes_total_manual: anime.episodes_total_manual,
@@ -848,6 +878,7 @@ export default function App() {
             id: anime.id,
             status: anime.status,
             episode_current: anime.episode_current,
+            episode_unknown: Boolean(anime.episode_unknown),
             rating_personal: anime.rating_personal,
             notes: anime.notes,
             display_title: anime.display_title,
@@ -1003,11 +1034,15 @@ export default function App() {
           <button className={page === 'library' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('library')}>Biblioteca</button>
           <button className={page === 'discover' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('discover')}>Descobrir</button>
           <button className={page === 'lists' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('lists')}>Listas</button>
-        </nav>
+                  </nav>
         <div className="topbar-actions">
-          <button className="global-search" aria-label="Buscar animes e estúdios" onClick={() => {
-            setSearchMode('global'); setSearchOpen(true); setSearchQuery(''); setResults([]);
-          }}><Search size={16} /><span>Buscar animes, estúdios...</span></button>
+          <button className="global-search" aria-label="Buscar usuários" onClick={() => {
+            setCommunityReturnPage(page);
+            setCommunityReturnProfile(page === 'community' ? communityTargetProfile : null);
+            setCommunitySearchInitialQuery('');
+            setCommunityOpen(true);
+            setCommunitySearchRequest(value => value + 1);
+          }}><Search size={16} /><span>Buscar usuários...</span></button>
           <button className="primary-button top-add" onClick={() => {
             setSearchMode('add'); setSearchOpen(true); setSearchQuery(''); setResults([]);
           }}><Plus size={16} />Adicionar anime</button>
@@ -1029,6 +1064,14 @@ export default function App() {
                 <strong>{authUser?.user_metadata?.username || authUser?.user_metadata?.username || authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'Biblioteca local'}</strong>
                 <span>{authUser?.email || 'Seus dados ficam salvos neste navegador.'}</span>
               </div>
+              {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={() => {
+                setProfileOpen(false);
+                setCommunityReturnPage(page);
+                setCommunityReturnProfile(page === 'community' ? communityTargetProfile : null);
+                setCommunityTargetProfile(null);
+                navigate('community');
+                setCommunityProfileRequest(value => value + 1);
+              }}><UserRound size={15} />Meu perfil</button>}
               {storageMode === 'supabase' && <button className="profile-signout" role="menuitem" onClick={async () => {
                 setProfileOpen(false);
                 const { error } = await supabase.auth.signOut();
@@ -1136,6 +1179,24 @@ export default function App() {
             findInCollection={anime => items.find(item => String(item.mal_id) === String(anime.mal_id)) || null}
             isInCollection={isInCollection}
           />
+        ) : page === 'community' ? (
+          <CommunityPage
+            open
+            pageMode
+            currentUserId={authUser?.id}
+            initialProfile={communityTargetProfile}
+            openMyProfileSignal={communityProfileRequest}
+            acknowledgeMyProfileRequest={setCommunityProfileRequest}
+            onBackToSearch={query => {
+              setCommunityTargetProfile(communityReturnProfile);
+              setPage(communityReturnPage || 'home');
+              setCommunitySearchInitialQuery(query || '');
+              setCommunityOpen(true);
+              setCommunitySearchRequest(value => value + 1);
+            }}
+            onOpenProfile={profile => setCommunityTargetProfile(profile)}
+            onActiveProfileChange={setCommunityTargetProfile}
+          />
         ) : (
           <ListsPage
             items={items}
@@ -1166,6 +1227,23 @@ export default function App() {
         <button className={page === 'discover' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('discover')}><Compass size={19} /><span>Descobrir</span></button>
         <button className={page === 'lists' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('lists')}><List size={19} /><span>Listas</span></button>
       </nav>
+
+      {communityOpen && (
+        <CommunityPage
+          open
+          currentUserId={authUser?.id}
+          initialQuery={communitySearchInitialQuery}
+          onClose={() => setCommunityOpen(false)}
+          onOpenProfile={(profile, query) => {
+            setCommunityTargetProfile(profile);
+            setCommunitySearchInitialQuery(query || '');
+            setCommunityOpen(false);
+            navigate('community');
+          }}
+          focusSearchSignal={communitySearchRequest}
+          acknowledgeSearchRequest={setCommunitySearchRequest}
+        />
+      )}
 
       {searchOpen && (
         <SearchModal
@@ -1371,7 +1449,7 @@ function PosterCard({ anime, onClick, compact = false }) {
         {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <div className="poster-fallback"><Clapperboard size={25} /></div>}
         <span className={'status-pill tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
         {anime.format && <span className="poster-format-pill">{localizedFormat(anime.format)}</span>}
-        {anime.status !== 'watching' && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
+        {!['watching', 'paused'].includes(anime.status) && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
         {anime.status === 'watching' && <>
           <span className={total ? 'poster-progress' : 'poster-progress is-indeterminate'}><i style={{ width: (total ? progress : 34) + '%' }} /></span>
           <span className="poster-episode-count">EP. {Number(anime.episode_current || 0)}{total ? ' / ' + total : ''}</span>
@@ -1466,8 +1544,8 @@ function AnimeRow({ anime, onClick }) {
       {anime.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <div className="row-fallback"><Clapperboard size={20} /></div>}
       <span className="row-title"><strong>{displayTitle(anime)}</strong><small>{formatReleaseLabel(anime)} · {localizedFormat(anime.format)}</small></span>
       <span className={'row-status tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
-      <span className={!total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}<i><b style={{ width: (total ? pct : 34) + '%' }} /></i></span>
-      <span className="row-rating">{anime.status !== 'watching' && anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
+      <span className={anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'row-progress is-unknown' : !total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'Episódio não lembrado' : total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}{!(anime.episode_unknown && ['paused', 'dropped'].includes(anime.status)) && <i><b style={{ width: (total ? pct : 34) + '%' }} /></i>}</span>
+      <span className="row-rating">{!['watching', 'paused'].includes(anime.status) && anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
       <ChevronRight size={16} className="row-chevron" />
     </button>
   );
@@ -1795,6 +1873,814 @@ function CatalogError({ message, onRetry }) {
   return <div className="catalog-error"><div><Compass size={22} /><strong>Catálogo indisponível no momento</strong><p>{message}</p><button className="outline-button" onClick={onRetry}>Tentar novamente</button></div></div>;
 }
 
+
+function SocialAvatar({ profile, size = 'medium' }) {
+  return (
+    <span className={'social-avatar social-avatar-' + size}>
+      {profile?.avatar_url
+        ? <img src={profile.avatar_url} alt="" loading="lazy" />
+        : getInitials(profile?.display_name || profile?.username || 'K')}
+    </span>
+  );
+}
+
+function AvatarCropModal({ file, onCancel, onConfirm }) {
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [dimensions, setDimensions] = useState(null);
+  const [viewportSize, setViewportSize] = useState(320);
+  const MIN_CROP_ZOOM = 1.25;
+  const [zoom, setZoom] = useState(MIN_CROP_ZOOM);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const imageRef = useRef(null);
+  const viewportRef = useRef(null);
+  const dragRef = useRef(null);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setSourceUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  useEffect(() => {
+    const measure = () => {
+      if (viewportRef.current) {
+        setViewportSize(viewportRef.current.getBoundingClientRect().width || 320);
+      }
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [sourceUrl]);
+
+  useEffect(() => {
+    const onKeyDown = event => {
+      if (event.key === 'Escape' && !processing) onCancel?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onCancel, processing]);
+
+  const baseScale = dimensions
+    ? Math.max(viewportSize / dimensions.width, viewportSize / dimensions.height)
+    : 1;
+  const scale = baseScale * zoom;
+  const displayWidth = dimensions ? dimensions.width * scale : viewportSize;
+  const displayHeight = dimensions ? dimensions.height * scale : viewportSize;
+  const maxOffsetX = Math.max(0, (displayWidth - viewportSize) / 2);
+  const maxOffsetY = Math.max(0, (displayHeight - viewportSize) / 2);
+
+  function clampOffset(nextOffset) {
+    return {
+      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, nextOffset.x)),
+      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, nextOffset.y))
+    };
+  }
+
+  function updateZoom(nextZoom) {
+    const safeZoom = Math.max(MIN_CROP_ZOOM, Math.min(4, Number(nextZoom) || MIN_CROP_ZOOM));
+    setZoom(safeZoom);
+    const nextScale = baseScale * safeZoom;
+    const nextMaxX = Math.max(0, (dimensions.width * nextScale - viewportSize) / 2);
+    const nextMaxY = Math.max(0, (dimensions.height * nextScale - viewportSize) / 2);
+    setOffset(current => ({
+      x: Math.max(-nextMaxX, Math.min(nextMaxX, current.x)),
+      y: Math.max(-nextMaxY, Math.min(nextMaxY, current.y))
+    }));
+  }
+
+  function onPointerDown(event) {
+    if (!dimensions || processing) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startOffset: offset
+    };
+    setDragging(true);
+  }
+
+  function onPointerMove(event) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    setOffset(clampOffset({
+      x: drag.startOffset.x + event.clientX - drag.startX,
+      y: drag.startOffset.y + event.clientY - drag.startY
+    }));
+  }
+
+  function onPointerUp(event) {
+    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    setDragging(false);
+  }
+
+  function confirmCrop() {
+    const image = imageRef.current;
+    if (!image || !dimensions || !scale) return;
+    setProcessing(true);
+    try {
+      const imageLeft = viewportSize / 2 - displayWidth / 2 + offset.x;
+      const imageTop = viewportSize / 2 - displayHeight / 2 + offset.y;
+      const sourceX = Math.max(0, Math.min(dimensions.width, (0 - imageLeft) / scale));
+      const sourceY = Math.max(0, Math.min(dimensions.height, (0 - imageTop) / scale));
+      const sourceSize = Math.min(
+        viewportSize / scale,
+        dimensions.width - sourceX,
+        dimensions.height - sourceY
+      );
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Não foi possível preparar a imagem.');
+      context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 512, 512);
+      canvas.toBlob(blob => {
+        if (!blob) {
+          setProcessing(false);
+          return;
+        }
+        const croppedFile = new File([blob], 'kataru-avatar.jpg', {
+          type: 'image/jpeg',
+          lastModified: Date.now()
+        });
+        onConfirm?.(croppedFile);
+      }, 'image/jpeg', 0.92);
+    } catch {
+      setProcessing(false);
+    }
+  }
+
+  return (
+    <div className="avatar-crop-overlay" onMouseDown={event => {
+      if (event.target === event.currentTarget && !processing) onCancel?.();
+    }}>
+      <section className="avatar-crop-dialog" role="dialog" aria-modal="true" aria-label="Ajustar foto de perfil">
+        <header className="avatar-crop-header">
+          <button type="button" className="avatar-crop-close" onClick={onCancel} disabled={processing} aria-label="Cancelar recorte">
+            <X size={20} />
+          </button>
+          <strong>Arraste a imagem para ajustar</strong>
+          <button type="button" className="avatar-crop-load" onClick={confirmCrop} disabled={!dimensions || processing}>
+            {processing ? <LoaderCircle size={16} className="spin" /> : <Check size={17} />}
+            {processing ? 'Preparando...' : 'Carregar'}
+          </button>
+        </header>
+        <div className="avatar-crop-body">
+          <div
+            ref={viewportRef}
+            className={'avatar-crop-viewport' + (dragging ? ' is-dragging' : '')}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onLostPointerCapture={onPointerUp}
+            tabIndex={0}
+            onKeyDown={event => {
+              if (!dimensions || processing) return;
+              const step = event.shiftKey ? 12 : 4;
+              if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)) event.preventDefault();
+              if (event.key === 'ArrowUp') setOffset(current => clampOffset({ ...current, y: current.y - step }));
+              if (event.key === 'ArrowDown') setOffset(current => clampOffset({ ...current, y: current.y + step }));
+              if (event.key === 'ArrowLeft') setOffset(current => clampOffset({ ...current, x: current.x - step }));
+              if (event.key === 'ArrowRight') setOffset(current => clampOffset({ ...current, x: current.x + step }));
+            }}
+          >
+            {sourceUrl && (
+              <img
+                ref={imageRef}
+                src={sourceUrl}
+                alt="Prévia para recorte"
+                draggable="false"
+                onLoad={event => {
+                  const image = event.currentTarget;
+                  setDimensions({ width: image.naturalWidth, height: image.naturalHeight });
+                  setOffset({ x: 0, y: 0 });
+                  setZoom(MIN_CROP_ZOOM);
+                  if (viewportRef.current) {
+                    setViewportSize(viewportRef.current.getBoundingClientRect().width || 320);
+                  }
+                }}
+                style={{
+                  width: displayWidth,
+                  height: displayHeight,
+                  transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`
+                }}
+              />
+            )}
+          </div>
+          <div className="avatar-crop-controls">
+            <button type="button" onClick={() => updateZoom(zoom - 0.15)} disabled={zoom <= 1 || processing} aria-label="Diminuir zoom">−</button>
+            <input
+              type="range"
+              min={MIN_CROP_ZOOM}
+              max="4"
+              step="0.01"
+              value={zoom}
+              onChange={event => updateZoom(event.target.value)}
+              disabled={!dimensions || processing}
+              aria-label="Zoom da foto"
+            />
+            <button type="button" onClick={() => updateZoom(zoom + 0.15)} disabled={zoom >= 4 || processing} aria-label="Aumentar zoom">+</button>
+          </div>
+          <p className="avatar-crop-hint">Mova a imagem para encaixar seu rosto no círculo</p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SocialUserCard({ profile, onOpen, action, hint }) {
+  return (
+    <article className="social-user-card">
+      <button className="social-user-main" onClick={onOpen}>
+        <SocialAvatar profile={profile} />
+        <span className="social-user-copy">
+          <strong>{profile.display_name || profile.username}</strong>
+          <small>@{profile.username}</small>
+          {profile.bio && <span>{profile.bio}</span>}
+          {hint && <small className="social-user-hint">{hint}</small>}
+        </span>
+      </button>
+      {action && <div className="social-user-action">{action}</div>}
+    </article>
+  );
+}
+
+function CommunityPage({ open, pageMode = false, onClose, onOpenProfile, onBackToSearch, onActiveProfileChange, currentUserId, initialProfile = null, initialQuery = '', openMyProfileSignal = 0, acknowledgeMyProfileRequest, focusSearchSignal = 0, acknowledgeSearchRequest }) {
+  const [query, setQuery] = useState(initialQuery || '');
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedProfile, setSelectedProfile] = useState(() => (pageMode ? initialProfile : null));
+  const [profileStats, setProfileStats] = useState({ followers: 0, following: 0 });
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [profileAnime, setProfileAnime] = useState([]);
+  const [profileLists, setProfileLists] = useState([]);
+  const [profileTab, setProfileTab] = useState('library');
+  const [selectedList, setSelectedList] = useState(null);
+  const [connections, setConnections] = useState([]);
+  const [connectionsType, setConnectionsType] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [contentLoading, setContentLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ username: '', display_name: '', bio: '' });
+  const [usernameAvailability, setUsernameAvailability] = useState('current');
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState('');
+  const [avatarCropFile, setAvatarCropFile] = useState(null);
+  const [removeAvatar, setRemoveAvatar] = useState(false);
+  const avatarInputRef = useRef(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [notice, setNotice] = useState('');
+  const searchInputRef = useRef(null);
+  const activeRouteProfileIdRef = useRef(null);
+
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreviewUrl('');
+      return undefined;
+    }
+    const previewUrl = URL.createObjectURL(avatarFile);
+    setAvatarPreviewUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [avatarFile]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (focusSearchSignal > 0) {
+      acknowledgeSearchRequest?.(0);
+      setSelectedProfile(null);
+      setSelectedList(null);
+      setConnectionsType(null);
+      setConnections([]);
+      setError('');
+      setNotice('');
+      searchInputRef.current?.focus();
+    }
+  }, [focusSearchSignal, acknowledgeSearchRequest]);
+
+  useEffect(() => {
+    let active = true;
+    const term = query.trim();
+    if (term.length < 2) {
+      setSearchResults([]);
+      return undefined;
+    }
+    setLoading(true);
+    setError('');
+    const timer = window.setTimeout(() => {
+      searchKataruProfiles(term)
+        .then(profiles => { if (active) setSearchResults(profiles); })
+        .catch(loadError => { if (active) setError(loadError.message || 'Não foi possível pesquisar usuários.'); })
+        .finally(() => { if (active) setLoading(false); });
+    }, 260);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [query]);
+
+  async function loadProfileContent(userId) {
+    setContentLoading(true);
+    try {
+      const [anime, lists] = await Promise.all([
+        getFollowedKataruAnime(userId),
+        getFollowedKataruLists(userId)
+      ]);
+      setProfileAnime(anime);
+      setProfileLists(lists);
+    } catch (loadError) {
+      setProfileAnime([]);
+      setProfileLists([]);
+      setError(loadError.message || 'Não foi possível abrir o conteúdo deste perfil.');
+    } finally {
+      setContentLoading(false);
+    }
+  }
+
+  async function openProfile(profile) {
+    if (pageMode) {
+      activeRouteProfileIdRef.current = profile.user_id;
+      onActiveProfileChange?.(profile);
+    }
+    setSelectedList(null);
+    setConnectionsType(null);
+    setConnections([]);
+    setSelectedProfile(profile);
+    setIsFollowing(false);
+    setProfileStats({ followers: 0, following: 0 });
+    setProfileAnime([]);
+    setProfileLists([]);
+    setProfileTab('library');
+    setEditingProfile(false);
+    setNotice('');
+    setError('');
+    setBusy(false);
+    setContentLoading(true);
+    const ownProfile = profile.user_id === currentUserId;
+    try {
+      const [stats, followed] = await Promise.all([
+        getKataruSocialStats(profile.user_id),
+        ownProfile ? Promise.resolve(false) : isFollowingKataruUser(profile.user_id)
+      ]);
+      setProfileStats(stats);
+      setIsFollowing(followed);
+      if (ownProfile || followed) {
+        await loadProfileContent(profile.user_id);
+      } else {
+        setProfileAnime([]);
+        setProfileLists([]);
+        setContentLoading(false);
+      }
+      setProfileForm({
+        username: profile.username || '',
+        display_name: profile.display_name || profile.username || '',
+        bio: profile.bio || ''
+      });
+      setUsernameAvailability('current');
+    } catch (loadError) {
+      setContentLoading(false);
+      setError(loadError.message || 'Não foi possível carregar o perfil.');
+    }
+  }
+
+  useEffect(() => {
+    if (!pageMode) return;
+    if (!initialProfile) {
+      activeRouteProfileIdRef.current = null;
+      return;
+    }
+    if (activeRouteProfileIdRef.current !== initialProfile.user_id) {
+      activeRouteProfileIdRef.current = initialProfile.user_id;
+      openProfile(initialProfile);
+    }
+  }, [pageMode, initialProfile?.user_id]);
+
+  async function openMyProfile() {
+    setLoading(true);
+    setError('');
+    try {
+      const profile = await getCurrentKataruProfile();
+      if (!profile) throw new Error('Seu perfil ainda não está disponível. Saia e entre novamente na conta.');
+      await openProfile(profile);
+    } catch (loadError) {
+      setError(loadError.message || 'Não foi possível abrir seu perfil.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (openMyProfileSignal > 0) {
+      acknowledgeMyProfileRequest?.(0);
+      openMyProfile();
+    }
+  }, [openMyProfileSignal, acknowledgeMyProfileRequest]);
+
+  async function toggleFollow() {
+    if (!selectedProfile || selectedProfile.user_id === currentUserId || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      if (isFollowing) {
+        await unfollowKataruUser(selectedProfile.user_id);
+        setIsFollowing(false);
+        setProfileAnime([]);
+        setProfileLists([]);
+        setProfileStats(current => ({ ...current, followers: Math.max(0, current.followers - 1) }));
+        setNotice('Você deixou de seguir @' + selectedProfile.username + '.');
+      } else {
+        await followKataruUser(selectedProfile.user_id);
+        setIsFollowing(true);
+        setProfileStats(current => ({ ...current, followers: current.followers + 1 }));
+        setNotice('Agora você está seguindo @' + selectedProfile.username + '.');
+        await loadProfileContent(selectedProfile.user_id);
+      }
+    } catch (followError) {
+      setError(followError.message || 'Não foi possível atualizar o relacionamento.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function showConnections(type) {
+    if (!selectedProfile) return;
+    setConnectionsType(type);
+    setConnections([]);
+    setLoading(true);
+    setError('');
+    try {
+      const profiles = await getKataruRelationProfiles(selectedProfile.user_id, type);
+      setConnections(profiles);
+    } catch (connectionError) {
+      setError(connectionError.message || 'Não foi possível carregar esta lista.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!editingProfile || selectedProfile?.user_id !== currentUserId) {
+      setUsernameAvailability('current');
+      return undefined;
+    }
+    const candidate = String(profileForm.username || '').trim().toLowerCase();
+    const current = String(selectedProfile?.username || '').toLowerCase();
+    if (candidate === current) {
+      setUsernameAvailability('current');
+      return undefined;
+    }
+    if (!KATARU_USERNAME_PATTERN.test(candidate)) {
+      setUsernameAvailability('invalid');
+      return undefined;
+    }
+    let active = true;
+    setUsernameAvailability('checking');
+    const timer = window.setTimeout(async () => {
+      try {
+        const available = await isKataruUsernameAvailable(candidate);
+        if (active) setUsernameAvailability(available ? 'available' : 'taken');
+      } catch {
+        if (active) setUsernameAvailability('error');
+      }
+    }, 350);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [editingProfile, profileForm.username, selectedProfile?.username, selectedProfile?.user_id, currentUserId]);
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    const nextUsername = String(profileForm.username || '').trim().toLowerCase();
+    const currentUsername = String(selectedProfile?.username || '').toLowerCase();
+    if (!KATARU_USERNAME_PATTERN.test(nextUsername)) {
+      setError('Use de 3 a 20 caracteres: letras, números ou _.');
+      return;
+    }
+    setSavingProfile(true);
+    setError('');
+    let uploadedAvatar = null;
+    try {
+      if (nextUsername !== currentUsername) {
+        const available = await isKataruUsernameAvailable(nextUsername);
+        if (!available) throw new Error('Esse nome de usuário já está em uso ou reservado. Escolha outro.');
+      }
+
+      const previousAvatarPath = getKataruAvatarPath(selectedProfile.avatar_url);
+      let nextAvatarUrl = removeAvatar ? null : (selectedProfile.avatar_url || null);
+      if (avatarFile) {
+        uploadedAvatar = await uploadKataruAvatar(avatarFile);
+        nextAvatarUrl = uploadedAvatar.publicUrl;
+      }
+
+      const nextDisplayName = String(profileForm.display_name || '').trim();
+      const updated = await updateKataruProfile({
+        ...profileForm,
+        username: nextUsername,
+        avatar_url: nextAvatarUrl,
+        // If the display name was only mirroring the old @, keep it in sync.
+        display_name: nextDisplayName === currentUsername ? nextUsername : nextDisplayName
+      });
+      setSelectedProfile(updated);
+      setProfileForm({
+        username: updated.username || '',
+        display_name: updated.display_name || updated.username || '',
+        bio: updated.bio || ''
+      });
+      setAvatarFile(null);
+      setRemoveAvatar(false);
+      setUsernameAvailability('current');
+      setEditingProfile(false);
+      setNotice('Seu perfil foi atualizado.');
+
+      const avatarChanged = Boolean(uploadedAvatar || removeAvatar);
+      if (avatarChanged && previousAvatarPath && previousAvatarPath !== (uploadedAvatar?.path || null)) {
+        removeKataruAvatar(previousAvatarPath).catch(() => {});
+      }
+    } catch (saveError) {
+      if (uploadedAvatar?.path) removeKataruAvatar(uploadedAvatar.path).catch(() => {});
+      setError(saveError.code === '23505'
+        ? 'Esse nome de usuário acabou de ser escolhido. Tente outro.'
+        : saveError.message || 'Não foi possível atualizar seu perfil.');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  function cancelProfileEditing() {
+    setProfileForm({
+      username: selectedProfile?.username || '',
+      display_name: selectedProfile?.display_name || selectedProfile?.username || '',
+      bio: selectedProfile?.bio || ''
+    });
+    setAvatarFile(null);
+    setAvatarCropFile(null);
+    setRemoveAvatar(false);
+    setError('');
+    setEditingProfile(false);
+  }
+
+  function returnToUserSearch() {
+    const previousQuery = query;
+    setSelectedProfile(null);
+    setSelectedList(null);
+    setConnectionsType(null);
+    setConnections([]);
+    setNotice('');
+    setError('');
+    if (pageMode) onBackToSearch?.(previousQuery);
+  }
+
+  function renderAnimeGrid(entries) {
+    const ordered = groupAnimeByFranchise(entries, 'franchise').flatMap(group => group.items);
+    if (!ordered.length) {
+      return <div className="social-empty"><Library size={23} /><strong>Biblioteca vazia</strong><span>Este perfil ainda não adicionou animes.</span></div>;
+    }
+    return (
+      <div className="social-anime-grid">
+        {ordered.map(anime => (
+          <article className="social-anime-card" key={anime.id}>
+            <div className="social-anime-art">
+              {anime.image_url ? <img src={anime.image_url} alt={'Pôster de ' + displayTitle(anime)} loading="lazy" /> : <Clapperboard size={22} />}
+              {anime.format && <span>{localizedFormat(anime.format)}</span>}
+            </div>
+            <strong>{displayTitle(anime)}</strong>
+            <small>{formatReleaseLabel(anime)}</small>
+            <em className={'tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</em>
+          </article>
+        ))}
+      </div>
+    );
+  }
+
+  if (!open) return null;
+  if (pageMode && !selectedProfile) {
+    return (
+      <div className="community-page community-profile-page">
+        {loading || openMyProfileSignal > 0 ? (
+          <div className="loading-block"><LoaderCircle className="spin" />Carregando perfil...</div>
+        ) : (
+          <div className="social-profile-load-error">
+            <div className="empty-state-icon"><UserRound size={23} /></div>
+            <h2>Não foi possível abrir este perfil</h2>
+            <p>{error || 'O perfil não foi encontrado ou não está disponível no momento.'}</p>
+            <div className="empty-actions">
+              <button className="outline-button" onClick={returnToUserSearch}><Search size={14} />Voltar à busca</button>
+              <button className="primary-button" onClick={() => openMyProfile()}><UserRound size={14} />Tentar novamente</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const modalTitle = selectedProfile
+    ? (selectedProfile.display_name || selectedProfile.username)
+    : 'Buscar usuários';
+
+  if (selectedProfile) {
+    const ownProfile = selectedProfile.user_id === currentUserId;
+    const visible = ownProfile || isFollowing;
+    const listEntries = selectedList
+      ? (selectedList.anime_ids || []).map(id => profileAnime.find(anime => String(anime.mal_id) === String(id))).filter(Boolean)
+      : [];
+    const profileContent = (
+      <>
+                <button className="back-link" onClick={selectedList ? () => setSelectedList(null) : connectionsType ? () => setConnectionsType(null) : returnToUserSearch}>
+                  <ChevronLeft size={16} />{selectedList ? 'Voltar às listas' : connectionsType ? 'Voltar ao perfil' : 'Voltar à busca de usuários'}
+                </button>
+                {selectedList ? (
+                  <section className="social-list-detail">
+                    <div className="social-list-detail-head">
+                      <span className="social-list-icon"><List size={23} /></span>
+                      <div><p className="eyebrow">LISTA DE @{selectedProfile.username}</p><h1>{selectedList.name}</h1><p>{selectedList.description || 'Uma seleção de animes.'}</p><small>{listEntries.length} {listEntries.length === 1 ? 'anime' : 'animes'}{selectedList.is_ranked ? ' · ranqueada' : ''}</small></div>
+                    </div>
+                    {renderAnimeGrid(listEntries)}
+                  </section>
+                ) : connectionsType ? (
+                  <section className="social-connections-panel">
+                    <div className="page-intro"><div><p className="eyebrow">COMUNIDADE KATARU</p><h1>{connectionsType === 'followers' ? 'Seguidores' : 'Seguindo'}</h1><p className="page-subtitle">Pessoas relacionadas a @{selectedProfile.username}.</p></div></div>
+                    {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando pessoas...</div> : connections.length ? (
+                      <div className="social-user-grid">
+                        {connections.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => openProfile(profile)} />)}
+                      </div>
+                    ) : <div className="social-empty"><Users size={23} /><strong>Ninguém por aqui ainda</strong></div>}
+                  </section>
+                ) : (
+                  <>
+                    <section className="social-profile-hero">
+                      <div className="social-profile-main">
+                        <SocialAvatar profile={selectedProfile} size="large" />
+                        <div className="social-profile-copy">
+                          <p className="eyebrow">{ownProfile ? 'MEU PERFIL' : 'PERFIL KATARU'}</p>
+                          <h1>{selectedProfile.display_name || selectedProfile.username}</h1>
+                          <span>@{selectedProfile.username}</span>
+                          {selectedProfile.bio && <p>{selectedProfile.bio}</p>}
+                          <small>Na comunidade desde {formatDate(selectedProfile.created_at)}</small>
+                        </div>
+                      </div>
+                      <div className="social-profile-actions">
+                        {ownProfile
+                          ? <button className="outline-button" onClick={() => editingProfile ? cancelProfileEditing() : setEditingProfile(true)}><Pencil size={14} />{editingProfile ? 'Cancelar edição' : 'Editar perfil'}</button>
+                          : <button className={isFollowing ? 'outline-button social-following-button' : 'primary-button'} onClick={toggleFollow} disabled={busy}>
+                              {busy ? <LoaderCircle size={15} className="spin" /> : isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
+                              {busy ? 'Aguarde...' : isFollowing ? 'Seguindo' : 'Seguir'}
+                            </button>}
+                      </div>
+                      <div className="social-profile-stats">
+                        <button onClick={() => showConnections('followers')}><strong>{profileStats.followers}</strong><span>Seguidores</span></button>
+                        <button onClick={() => showConnections('following')}><strong>{profileStats.following}</strong><span>Seguindo</span></button>
+                        <div><strong>{ownProfile || isFollowing ? profileAnime.length : '—'}</strong><span>Animes</span></div>
+                      </div>
+                    </section>
+                    {editingProfile && ownProfile && (
+                      <form className="social-profile-edit" onSubmit={saveProfile}>
+                        <div className="social-avatar-picker-row">
+                          <button
+                            type="button"
+                            className="social-avatar-picker"
+                            onClick={() => avatarInputRef.current?.click()}
+                            disabled={savingProfile}
+                            aria-label="Escolher foto de perfil"
+                            title="Escolher foto de perfil"
+                          >
+                            <SocialAvatar
+                              profile={{
+                                ...selectedProfile,
+                                avatar_url: avatarFile ? avatarPreviewUrl : removeAvatar ? null : selectedProfile.avatar_url
+                              }}
+                              size="large"
+                            />
+                            <span className="social-avatar-picker-plus"><Plus size={17} strokeWidth={2.5} /></span>
+                          </button>
+                          <input
+                            ref={avatarInputRef}
+                            className="social-avatar-file-input"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={event => {
+                              const file = event.target.files?.[0];
+                              event.target.value = '';
+                              if (!file) return;
+                              if (!['image/jpeg','image/png','image/webp'].includes(file.type)) {
+                                setError('Use uma imagem JPG, PNG ou WEBP.');
+                                return;
+                              }
+                              if (file.size > 2 * 1024 * 1024) {
+                                setError('A imagem precisa ter no máximo 2 MB.');
+                                return;
+                              }
+                              setError('');
+                              setAvatarCropFile(file);
+                            }}
+                          />
+                        </div>
+                        <label>Nome de usuário
+                          <span className="social-username-edit-field"><span>@</span><input autoCapitalize="none" autoCorrect="off" spellCheck="false" maxLength={20} value={profileForm.username} onChange={event => setProfileForm(value => ({ ...value, username: event.target.value.toLowerCase() }))} placeholder="seu_usuario" /></span>
+                          <small>Seu @ público. Use de 3 a 20 caracteres: letras, números ou _.</small>
+                        </label>
+                        {usernameAvailability === 'checking' && <p className="social-username-feedback"><LoaderCircle size={12} className="spin" /> Verificando disponibilidade...</p>}
+                        {usernameAvailability === 'available' && <p className="social-username-feedback is-good"><Check size={12} /> @ disponível</p>}
+                        {usernameAvailability === 'taken' && <p className="social-username-feedback is-bad"><AlertCircle size={12} /> Esse @ já está em uso ou reservado.</p>}
+                        {usernameAvailability === 'invalid' && <p className="social-username-feedback is-bad"><AlertCircle size={12} /> Use de 3 a 20 caracteres: letras, números ou _.</p>}
+                        {usernameAvailability === 'error' && <p className="social-username-feedback is-bad"><AlertCircle size={12} /> Não foi possível verificar agora. Tente novamente.</p>}
+                        <label>Nome de exibição<input maxLength={50} value={profileForm.display_name} onChange={event => setProfileForm(value => ({ ...value, display_name: event.target.value }))} placeholder="Como as pessoas verão você" /></label>
+                        <label>Bio<textarea maxLength={160} rows={3} value={profileForm.bio} onChange={event => setProfileForm(value => ({ ...value, bio: event.target.value }))} placeholder="Conte um pouco sobre seus gostos de anime" /></label>
+                        <div><small>{profileForm.bio.length}/160 caracteres</small><button className="primary-button" type="submit" disabled={savingProfile || !KATARU_USERNAME_PATTERN.test(String(profileForm.username || '').trim().toLowerCase()) || (String(profileForm.username || '').trim().toLowerCase() !== String(selectedProfile.username || '').toLowerCase() && usernameAvailability !== 'available')}>{savingProfile ? 'Salvando...' : 'Salvar perfil'}</button></div>
+                      </form>
+                    )}
+                    {notice && <div className="social-notice">{notice}</div>}
+                    {error && <div className="social-error">{error}</div>}
+                    <div className="social-profile-tabs">
+                      <button className={profileTab === 'library' ? 'active' : ''} onClick={() => { setProfileTab('library'); setSelectedList(null); }}><Library size={15} />Biblioteca</button>
+                      <button className={profileTab === 'lists' ? 'active' : ''} onClick={() => { setProfileTab('lists'); setSelectedList(null); }}><List size={15} />Listas <span>{visible ? profileLists.length : '🔒'}</span></button>
+                    </div>
+                    {contentLoading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando biblioteca e listas...</div> : visible ? (
+                      profileTab === 'library' ? renderAnimeGrid(profileAnime) : profileLists.length ? (
+                        <div className="social-lists-grid">
+                          {profileLists.map(list => (
+                            <button className="social-list-card" key={list.id} onClick={() => setSelectedList(list)}>
+                              <span className="social-list-icon"><List size={22} /></span>
+                              <span><strong>{list.name}</strong><small>{list.description || 'Lista de animes'}</small><em>{list.anime_ids?.length || 0} títulos{list.is_ranked ? ' · ranqueada' : ''}</em></span>
+                              <ChevronRight size={17} />
+                            </button>
+                          ))}
+                        </div>
+                      ) : <div className="social-empty"><List size={23} /><strong>Nenhuma lista criada</strong><span>Este perfil ainda não criou listas.</span></div>
+                    ) : (
+                      <div className="social-private-state"><Users size={25} /><strong>Biblioteca e listas para seguidores</strong><p>Siga @{selectedProfile.username} para acompanhar seus animes e listas.</p><button className="primary-button" onClick={toggleFollow} disabled={busy}><UserPlus size={15} />Seguir para ver o perfil</button></div>
+                    )}
+                  </>
+                )}
+                {avatarCropFile && (
+                  <AvatarCropModal
+                    file={avatarCropFile}
+                    onCancel={() => setAvatarCropFile(null)}
+                    onConfirm={croppedFile => {
+                      setAvatarFile(croppedFile);
+                      setAvatarCropFile(null);
+                      setRemoveAvatar(false);
+                      setError('');
+                    }}
+                  />
+                )}
+      </>
+    );
+
+    if (pageMode) {
+      return <div className="community-page community-profile-page">{profileContent}</div>;
+    }
+
+    return (
+      <div className="overlay social-community-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
+        <section className="modal social-community-modal" role="dialog" aria-modal="true" aria-label={modalTitle}>
+          <div className="modal-header social-community-modal-header">
+            <div><p className="eyebrow">COMUNIDADE KATARU</p><h2>{modalTitle}</h2></div>
+            <button className="icon-button" onClick={onClose} aria-label="Fechar busca"><X size={17} /></button>
+          </div>
+          <div className="community-page">{profileContent}</div>
+        </section>
+      </div>
+    );
+  }
+  return (
+    <div className="overlay social-community-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
+      <section className="modal social-community-modal" role="dialog" aria-modal="true" aria-label="Buscar usuários">
+        <div className="modal-header social-community-modal-header">
+          <div><p className="eyebrow">COMUNIDADE KATARU</p><h2>Buscar usuários</h2><p>Encontre pessoas para acompanhar suas bibliotecas e listas.</p></div>
+          <button className="icon-button" onClick={onClose} aria-label="Fechar busca"><X size={17} /></button>
+        </div>
+        <div className="community-page">
+      <label className="social-search-field"><Search size={17} /><input ref={searchInputRef} autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar por usuário ou nome de exibição..." /><kbd>⌕</kbd></label>
+      <p className="social-search-note">Pesquise pelo @usuário ou nome de exibição. Digite pelo menos 2 caracteres.</p>
+      {error && <div className="social-error">{error}</div>}
+      {loading ? <div className="loading-block"><LoaderCircle className="spin" />Buscando usuários...</div> : query.trim().length >= 2 ? searchResults.length ? (
+        <div className="social-user-grid">
+          {searchResults.map(profile => <SocialUserCard key={profile.user_id} profile={profile} onOpen={() => onOpenProfile ? onOpenProfile(profile, query) : openProfile(profile)} hint="Abrir perfil" />)}
+        </div>
+      ) : <div className="social-empty"><Users size={23} /><strong>Nenhum usuário encontrado</strong><span>Confira o nome ou @usuário e tente novamente.</span></div> : (
+        <div className="social-discover-empty"><Users size={25} /><strong>Encontre pessoas no Kataru</strong><p>Digite um nome ou @usuário para abrir o perfil, seguir e acompanhar bibliotecas e listas.</p></div>
+        )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ListsPage({ items, lists, counts, onOpenStatus, onOpenList, onNewList, onEditList }) {
   const automatic = [
     { id: 'watching', title: 'Assistindo', description: 'Animes que você está acompanhando', icon: <Zap size={20} />, count: counts.watching || 0 },
@@ -1884,7 +2770,7 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
   const current = Number(anime.episode_current || 0);
   const progress = progressTotal ? Math.min(100, Math.round((current / progressTotal) * 100)) : 0;
   const canAdvance = ['watching', 'paused', 'dropped'].includes(anime.status) && (!progressTotal || current < progressTotal);
-  const ratingStars = anime.rating_personal ? Math.round(Number(anime.rating_personal) / 2) : 0;
+  const ratingStars = anime.rating_personal ? Number(anime.rating_personal) / 2 : 0;
 
   return (
     <section className="detail-page">
@@ -1908,8 +2794,18 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
             <div className="status-segment">{STATUSES.map(status => <button key={status.id} className={anime.status === status.id ? 'selected tone-' + status.tone : ''} onClick={() => onStatusChange(status.id)}>{status.label}</button>)}</div>
           </div>
 
-          <div className="detail-progress-card">
-            <div className="progress-card-top">
+          {anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? (
+            <div className="detail-progress-card episode-unknown-detail">
+              <div className="episode-unknown-icon"><Clock3 size={22} /></div>
+              <div>
+                <strong>{anime.status === 'paused' ? 'Você não lembra onde pausou' : 'Você não lembra onde parou'}</strong>
+                <p>O episódio não foi registrado para este anime.</p>
+                <button className="text-button" onClick={onEdit}>Informar episódio</button>
+              </div>
+            </div>
+          ) : (
+            <div className="detail-progress-card">
+              <div className="progress-card-top">
               <div><span className="eyebrow">SEU PROGRESSO</span><strong>{current}<small>{total ? ' / ' + total : available ? ' / ' + available + ' lançados' : ' episódios registrados'}</small></strong><span>episódios assistidos</span></div>
               <div className="progress-ring" style={{ '--progress': progress + '%' }}><strong>{progressTotal ? progress : '—'}<small>{progressTotal ? '%' : ''}</small></strong></div>
             </div>
@@ -1926,12 +2822,15 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
             </div>
             {!progressTotal && <p className="episode-availability-note">O catálogo ainda não informou quantos episódios estão disponíveis. Atualize os dados do anime para consultar o catálogo.</p>}
           </div>
+          )}
 
-          <div className="detail-rating-notes">
-            {anime.status === 'watching'
-              ? <section className="rating-panel rating-panel-locked"><div className="detail-block-heading"><span>SUA NOTA</span><strong>Avaliação após concluir</strong></div><p>Finalize o anime para registrar sua avaliação. Uma nota salva anteriormente será mantida.</p></section>
-              : <section className="rating-panel"><div className="detail-block-heading"><span>SUA NOTA</span><strong>{anime.rating_personal ? (Number(anime.rating_personal) / 2).toFixed(1) + ' / 5' : 'Ainda sem nota'}</strong></div><StarRating value={ratingStars} onChange={onRatingChange} /></section>}
-          </div>
+          {anime.status !== 'paused' && (
+            <div className="detail-rating-notes">
+              {anime.status === 'watching'
+                ? <section className="rating-panel rating-panel-locked"><div className="detail-block-heading"><span>SUA NOTA</span><strong>Avaliação após concluir</strong></div><p>Finalize o anime para registrar sua avaliação. Uma nota salva anteriormente será mantida.</p></section>
+                : <section className="rating-panel"><div className="detail-block-heading"><span>SUA NOTA</span><strong>{anime.rating_personal ? (Number(anime.rating_personal) / 2).toFixed(1) + ' / 5' : 'Ainda sem nota'}</strong></div><StarRating value={ratingStars} onChange={onRatingChange} /></section>}
+            </div>
+          )}
 
           <div className="detail-info-grid">
             <div><span>TEMPORADA</span><strong>{anime.season || '—'}{anime.year ? ' ' + anime.year : ''}</strong></div>
@@ -1951,7 +2850,63 @@ function Detail({ anime, lists, onBack, onEdit, onDelete, onSync, onEpisodeChang
 }
 
 function StarRating({ value, onChange }) {
-  return <div className="star-rating" role="group" aria-label="Sua nota de zero a cinco estrelas">{[1, 2, 3, 4, 5].map(star => <button type="button" key={star} className={star <= value ? 'filled' : ''} onClick={() => onChange(star === value ? 0 : star)} aria-label={star + ' estrelas'}><Star size={23} fill={star <= value ? 'currentColor' : 'none'} /></button>)}</div>;
+  const currentValue = Math.max(0, Math.min(5, Number(value) || 0));
+  const [hoverValue, setHoverValue] = useState(null);
+  const previewValue = hoverValue ?? currentValue;
+
+  function valueAtPointer(star, event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return star - (event.clientX - rect.left < rect.width / 2 ? 0.5 : 0);
+  }
+
+  return (
+    <div
+      className="star-rating"
+      role="group"
+      aria-label="Sua nota de zero a cinco estrelas, com intervalos de meia estrela"
+      onPointerLeave={() => setHoverValue(null)}
+      onBlur={event => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setHoverValue(null);
+      }}
+    >
+      {[1, 2, 3, 4, 5].map(star => {
+        const fill = Math.max(0, Math.min(1, previewValue - (star - 1)));
+        return (
+          <button
+            type="button"
+            key={star}
+            className={fill > 0 ? 'filled' : ''}
+            onPointerEnter={event => {
+              if (event.pointerType !== 'touch') setHoverValue(valueAtPointer(star, event));
+            }}
+            onPointerMove={event => {
+              if (event.pointerType !== 'touch') setHoverValue(valueAtPointer(star, event));
+            }}
+            onFocus={() => setHoverValue(star)}
+            onClick={event => {
+              const nextValue = event.detail === 0
+                ? star
+                : valueAtPointer(star, event);
+              onChange(Math.abs(nextValue - currentValue) < 0.001 ? 0 : nextValue);
+              setHoverValue(null);
+            }}
+            aria-label={star + ' estrelas; metade esquerda para ' + (star - 0.5)}
+            aria-pressed={Math.abs(currentValue - star) < 0.001}
+            title={'Passe o mouse para pré-visualizar; clique na metade esquerda para ' + (star - 0.5) + ' ou na direita para ' + star}
+          >
+            <span className="star-rating-symbol">
+              <Star className="star-rating-empty" size={23} />
+              {fill > 0 && (
+                <span className="star-rating-fill" style={{ width: (fill * 100) + '%' }}>
+                  <Star size={23} fill="currentColor" />
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function SearchModal({ query, setQuery, searchMode = 'add', results, searching, error, onSearch, onClose, onAdd, onOpenExisting, onManual, isInCollection, allowExisting, libraryItems = [], alreadyInListIds = [], targetListName = '' }) {
@@ -2032,6 +2987,7 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
   const isDirty = catalogRestored || (!isNew && (
     form.status !== (anime.status || 'planned') ||
     String(form.episode_current ?? 0) !== String(anime.episode_current ?? 0) ||
+    Boolean(form.episode_unknown) !== Boolean(anime.episode_unknown) ||
     String(form.rating_personal ?? '') !== String(anime.rating_personal ?? '') ||
     String(form.rewatch_count ?? 0) !== String(anime.rewatch_count ?? 0) ||
     String(form.started_at || '') !== String(anime.started_at || '') ||
@@ -2044,7 +3000,8 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
   const maxEpisode = total || available || undefined;
   const episode = Number(form.episode_current || 0);
   const needsEpisode = ['watching', 'paused', 'dropped'].includes(form.status);
-  const showRating = !['planned', 'watching'].includes(form.status);
+  const allowsUnknownEpisode = ['paused', 'dropped'].includes(form.status);
+  const showRating = !['planned', 'watching', 'paused'].includes(form.status);
   const dateShortcuts = key => <div className="date-shortcuts">
     <button type="button" onClick={() => update(key, today)}>Hoje</button>
     <button type="button" onClick={() => update(key, '')}>Não lembro</button>
@@ -2054,7 +3011,10 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
     status,
     episode_current: status === 'planned' ? 0
       : status === 'completed' ? (total || available || Number(current.episode_current || 0))
+      : current.episode_unknown && ['paused', 'dropped'].includes(status) ? 0
       : current.episode_current,
+    episode_unknown: ['paused', 'dropped'].includes(status) ? Boolean(current.episode_unknown) : false,
+    rating_personal: status === 'paused' ? '' : current.rating_personal,
     started_at: status === 'watching' && !current.started_at ? today : current.started_at,
     completed_at: status === 'completed' && !current.completed_at ? today : current.completed_at
   }));
@@ -2076,10 +3036,27 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
           {form.status === 'planned' && <p className="status-guidance">O anime será salvo em “Quero assistir”. Não é necessário preencher progresso ou datas.</p>}
           {form.status === 'watching' && <p className="status-guidance">Informe o episódio em que você está. A data de início é opcional.</p>}
           {form.status === 'completed' && <p className="status-guidance">Ao salvar como Assistido, o Kataru considera a obra concluída. Não precisa informar o número de episódios.</p>}
-          {form.status === 'paused' && <p className="status-guidance">Informe o episódio em que você pausou.</p>}
-          {form.status === 'dropped' && <p className="status-guidance">Informe o episódio em que você parou de assistir.</p>}
+          {form.status === 'paused' && <p className="status-guidance">Informe onde você pausou ou marque que não lembra o episódio.</p>}
+          {form.status === 'dropped' && <p className="status-guidance">Informe onde parou de assistir ou marque que não lembra o episódio.</p>}
         </div>
-        {needsEpisode && (
+        {allowsUnknownEpisode && (
+          <label className="episode-unknown-toggle">
+            <input
+              type="checkbox"
+              checked={Boolean(form.episode_unknown)}
+              onChange={event => setForm(current => ({
+                ...current,
+                episode_unknown: event.target.checked,
+                episode_current: event.target.checked ? 0 : Number(current.episode_current || 0)
+              }))}
+            />
+            <span>
+              <strong>{form.status === 'paused' ? 'Não lembro onde pausei' : 'Não lembro onde parei'}</strong>
+              <small>O episódio ficará sem informação de progresso.</small>
+            </span>
+          </label>
+        )}
+        {needsEpisode && !form.episode_unknown && (
           <label className="field episode-current-field">
             <span>{form.status === 'dropped' ? 'Episódio em que parou' : form.status === 'paused' ? 'Episódio em que pausou' : 'Episódio atual'}</span>
             <div className="number-stepper">
@@ -2097,7 +3074,7 @@ function EditorModal({ anime, form, setForm, saving, onSubmit, onClose, onRestor
             <label className="field rewatch-field"><span>Quantas vezes reassistiu?</span><input type="number" min="0" value={form.rewatch_count} onChange={event => update('rewatch_count', Math.max(0, Number(event.target.value || 0)))} /></label>
           </>
         )}
-        {showRating && <div className="editor-section rating-editor"><div><span className="field-label">Sua nota (opcional)</span><small>Avalie de 1 a 5 estrelas.</small></div><StarRating value={form.rating_personal ? Math.round(Number(form.rating_personal) / 2) : 0} onChange={stars => update('rating_personal', stars ? stars * 2 : '')} /></div>}
+        {showRating && <div className="editor-section rating-editor"><div><span className="field-label">Sua nota (opcional)</span><small>Avalie de 1 a 5 estrelas, em intervalos de 0,5.</small></div><StarRating value={form.rating_personal ? Number(form.rating_personal) / 2 : 0} onChange={stars => update('rating_personal', stars ? stars * 2 : '')} /></div>}
         {!form.is_manual && <div className="editor-catalog-actions"><p className="editor-catalog-note">Os dados básicos são obtidos automaticamente do catálogo.</p><button type="button" className="text-button" onClick={async () => { const restored = await onRestoreCatalog(); if (restored) setCatalogRestored(true); }}>Atualizar dados do catálogo</button></div>}
         <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancelar</button><button className="primary-button" disabled={saving}>{saving ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />}{isNew ? 'Adicionar à biblioteca' : 'Salvar alterações'}</button></div>
       </form>

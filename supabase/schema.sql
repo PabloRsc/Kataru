@@ -27,6 +27,7 @@ create table if not exists public.anime_collection (
   status text not null default 'planned'
     check (status in ('watching','completed','planned','paused','dropped')),
   episode_current integer not null default 0 check (episode_current >= 0),
+  episode_unknown boolean not null default false,
   rating_personal numeric check (rating_personal is null or (rating_personal >= 0 and rating_personal <= 10)),
   notes text,
   rewatch_count integer not null default 0,

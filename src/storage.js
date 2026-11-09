@@ -107,6 +107,207 @@ export async function deleteAnime(id) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(all.filter(item => String(item.id) !== String(id))));
 }
 
+export async function searchKataruProfiles(query, limit = 20) {
+  const user = await requireUser();
+  const term = String(query || '').trim().replace(/[^\p{L}\p{N}_ -]/gu, ' ').replace(/\s+/g, ' ');
+  if (term.length < 2) return [];
+  const filter = 'username.ilike.%' + term + '%,display_name.ilike.%' + term + '%';
+  const { data, error } = await supabase.from('kataru_profiles')
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .neq('user_id', user.id)
+    .or(filter)
+    .order('username', { ascending: true })
+    .limit(Math.min(40, Math.max(1, Number(limit) || 20)));
+  if (error) throw error;
+  return data || [];
+}
+
+export async function isKataruUsernameAvailable(candidate) {
+  await requireUser();
+  const username = String(candidate || '').trim().toLowerCase();
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) return false;
+  const { data, error } = await supabase.rpc('is_kataru_username_available', { candidate: username });
+  if (error) throw error;
+  return Boolean(data);
+}
+
+export async function updateKataruProfile(profile) {
+  const user = await requireUser();
+  const username = String(profile.username || '').trim().toLowerCase();
+  if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+    throw new Error('O nome de usuário precisa ter de 3 a 20 caracteres, usando apenas letras, números ou _.');
+  }
+  const payload = {
+    username,
+    display_name: String(profile.display_name || '').trim().slice(0, 50) || null,
+    bio: String(profile.bio || '').trim().slice(0, 160),
+    avatar_url: profile.avatar_url ?? null
+  };
+  const { data, error } = await supabase.from('kataru_profiles')
+    .update(payload)
+    .eq('user_id', user.id)
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function uploadKataruAvatar(file) {
+  const user = await requireUser();
+  if (!file) throw new Error('Escolha uma imagem para enviar.');
+  const allowedTypes = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp'
+  };
+  const extension = allowedTypes[file.type];
+  if (!extension) throw new Error('Use uma imagem JPG, PNG ou WEBP.');
+  if (file.size > 2 * 1024 * 1024) throw new Error('A imagem precisa ter no máximo 2 MB.');
+
+  const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
+  const { data, error } = await supabase.storage.from('avatars').upload(path, file, {
+    cacheControl: '3600',
+    contentType: file.type,
+    upsert: false
+  });
+  if (error) {
+    if (error.message?.toLowerCase().includes('bucket not found')) {
+      throw new Error('O armazenamento de fotos ainda não está configurado. Atualize as políticas de avatar no Supabase.');
+    }
+    throw error;
+  }
+  const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(data.path);
+  return { path: data.path, publicUrl: publicData.publicUrl };
+}
+
+export async function removeKataruAvatar(path) {
+  const user = await requireUser();
+  const safePath = String(path || '');
+  if (!safePath.startsWith(`${user.id}/`)) return false;
+  const { error } = await supabase.storage.from('avatars').remove([safePath]);
+  if (error) throw error;
+  return true;
+}
+
+export function getKataruAvatarPath(publicUrl) {
+  const marker = '/storage/v1/object/public/avatars/';
+  const value = String(publicUrl || '');
+  const position = value.indexOf(marker);
+  if (position < 0) return null;
+  return decodeURIComponent(value.slice(position + marker.length).split('?')[0]);
+}
+
+export async function getKataruProfile(userId) {
+  await requireUser();
+  const { data, error } = await supabase.from('kataru_profiles')
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+export async function getCurrentKataruProfile() {
+  const user = await requireUser();
+  return getKataruProfile(user.id);
+}
+
+export async function getKataruSocialStats(userId) {
+  await requireUser();
+  const [followers, following] = await Promise.all([
+    supabase.from('kataru_follows').select('follower_id', { count: 'exact', head: true }).eq('followed_id', userId),
+    supabase.from('kataru_follows').select('followed_id', { count: 'exact', head: true }).eq('follower_id', userId)
+  ]);
+  if (followers.error) throw followers.error;
+  if (following.error) throw following.error;
+  return { followers: followers.count || 0, following: following.count || 0 };
+}
+
+export async function isFollowingKataruUser(userId) {
+  const user = await requireUser();
+  const { data, error } = await supabase.from('kataru_follows')
+    .select('followed_id')
+    .eq('follower_id', user.id)
+    .eq('followed_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
+export async function followKataruUser(userId) {
+  const user = await requireUser();
+  if (user.id === userId) throw new Error('Você não pode seguir sua própria conta.');
+  const { error } = await supabase.from('kataru_follows')
+    .insert({ follower_id: user.id, followed_id: userId });
+  if (error && error.code !== '23505') throw error;
+  return true;
+}
+
+export async function unfollowKataruUser(userId) {
+  const user = await requireUser();
+  const { error } = await supabase.from('kataru_follows')
+    .delete()
+    .eq('follower_id', user.id)
+    .eq('followed_id', userId);
+  if (error) throw error;
+  return true;
+}
+
+export async function getKataruRelationProfiles(userId, relation = 'followers') {
+  await requireUser();
+  const isFollowers = relation === 'followers';
+  const { data: rows, error: relationError } = await supabase.from('kataru_follows')
+    .select('follower_id, followed_id')
+    .eq(isFollowers ? 'followed_id' : 'follower_id', userId)
+    .order('created_at', { ascending: false });
+  if (relationError) throw relationError;
+  const ids = (rows || []).map(row => isFollowers ? row.follower_id : row.followed_id).filter(Boolean);
+  if (!ids.length) return [];
+  const { data: profiles, error } = await supabase.from('kataru_profiles')
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .in('user_id', ids);
+  if (error) throw error;
+  const byId = new Map((profiles || []).map(profile => [profile.user_id, profile]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+
+export async function getFollowingKataruProfiles() {
+  const user = await requireUser();
+  const { data: follows, error: followError } = await supabase.from('kataru_follows')
+    .select('followed_id, created_at')
+    .eq('follower_id', user.id)
+    .order('created_at', { ascending: false });
+  if (followError) throw followError;
+  const ids = (follows || []).map(row => row.followed_id).filter(Boolean);
+  if (!ids.length) return [];
+  const { data: profiles, error } = await supabase.from('kataru_profiles')
+    .select('user_id, username, display_name, bio, avatar_url, created_at')
+    .in('user_id', ids);
+  if (error) throw error;
+  const byId = new Map((profiles || []).map(profile => [profile.user_id, profile]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+
+export async function getFollowedKataruAnime(userId) {
+  await requireUser();
+  const { data, error } = await supabase.from('kataru_shared_anime')
+    .select('*')
+    .eq('owner_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(fromRow);
+}
+
+export async function getFollowedKataruLists(userId) {
+  await requireUser();
+  const { data, error } = await supabase.from('kataru_shared_lists')
+    .select('*')
+    .eq('owner_id', userId)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(fromListRow);
+}
+
 export async function getAnimeLists() {
   if (supabase) {
     const user = await requireUser();
@@ -197,6 +398,7 @@ function toRow(anime, ownerId) {
     score_external: anime.score_external ?? null,
     status: anime.status || 'planned',
     episode_current: Number(anime.episode_current || 0),
+    episode_unknown: Boolean(anime.episode_unknown),
     rating_personal: anime.rating_personal ?? null,
     notes: anime.notes || null,
     rewatch_count: Number(anime.rewatch_count || 0),
@@ -223,6 +425,7 @@ function normalizeLocalAnime(anime) {
     studios: anime.studios || [],
     status: anime.status || 'planned',
     episode_current: Number(anime.episode_current || 0),
+    episode_unknown: Boolean(anime.episode_unknown),
     rewatch_count: Number(anime.rewatch_count || 0),
     rating_personal: anime.rating_personal ?? null,
     episodes_total_manual: anime.episodes_total_manual ?? null,

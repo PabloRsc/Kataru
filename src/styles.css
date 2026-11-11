@@ -2452,6 +2452,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .auth-error,
   .auth-message,
   .nav-link,
+  .mobile-nav-item span,
   .global-search,
   .primary-button,
   .outline-button,

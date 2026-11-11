@@ -1447,6 +1447,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
 
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Preparando sua biblioteca...</div> : (
         <>
+          <AnimeShelf title="Atualizados recentemente" subtitle="Os animes com atividade mais recente na sua biblioteca" items={recentlyUpdated} onViewAll={() => onOpenLibrary('all')} onOpenAnime={onOpenAnime} />
           <AnimeShelf title="Assistindo" subtitle="Continue acompanhando suas histórias" items={watching.slice(0, 8)} onViewAll={() => onOpenLibrary('watching')} onOpenAnime={onOpenAnime} />
           <AnimeShelf title="Assistidos recentemente" subtitle="Histórias que já chegaram ao fim" items={completed.slice(0, 8)} onViewAll={() => onOpenLibrary('completed')} onOpenAnime={onOpenAnime} />
           <AnimeShelf title="Quero assistir" subtitle="Sua próxima maratona pode estar aqui" items={planned.slice(0, 8)} onViewAll={() => onOpenLibrary('planned')} onOpenAnime={onOpenAnime} />

@@ -2382,3 +2382,166 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .social-shared-library-grid { width: 100%; margin-top: 2px; }
 .social-shared-library-grid .poster-card { min-width: 0; }
+
+
+/* Fase 1 — legibilidade, foco e áreas de interação */
+:root {
+  --text-scale-body: 12px;
+  --focus-ring: 0 0 0 3px #8B7CFF35;
+}
+
+:where(
+  .page-subtitle,
+  .home-welcome p:not(.eyebrow),
+  .hero-copy > p,
+  .feature-copy > p,
+  .welcome-copy p,
+  .section-heading p,
+  .discover-section-heading p,
+  .empty-home-note,
+  .discover-promo p,
+  .empty-state p,
+  .loading-block,
+  .search-field input,
+  .select-filter select,
+  .active-filters,
+  .filter-chip,
+  .clear-filters,
+  .results-summary,
+  .row-title strong,
+  .row-status,
+  .row-progress,
+  .row-rating,
+  .discover-tab,
+  .genre-context strong,
+  .catalog-error p,
+  .automatic-copy small,
+  .custom-list-info small,
+  .custom-list-info > span,
+  .empty-list-state p,
+  .back-link,
+  .list-heading-copy > p:not(.eyebrow),
+  .detail-original-title,
+  .detail-meta,
+  .detail-block-heading > strong,
+  .episode-controls > span,
+  .detail-notes-panel p,
+  .detail-info-grid strong,
+  .synopsis-panel p,
+  .helper-text,
+  .result-info strong,
+  .result-info span,
+  .result-info small,
+  .search-empty p,
+  .editor-anime-preview strong,
+  .field-label,
+  .field > span,
+  .field > small,
+  .field input,
+  .field select,
+  .field textarea,
+  .rating-editor small,
+  .editor-catalog-note,
+  .text-button,
+  .visibility-toggle strong,
+  .visibility-toggle small,
+  .auth-description,
+  .auth-field span,
+  .auth-field input,
+  .auth-links button,
+  .auth-error,
+  .auth-message,
+  .nav-link,
+  .mobile-nav-item span,
+  .global-search,
+  .primary-button,
+  .outline-button,
+  .text-link,
+  .hero-secondary,
+  .status-tab,
+  .view-toggle button,
+  .row-title small,
+  .feature-meta,
+  .custom-list-info strong,
+  .detail-info-grid span,
+  .detail-list-action label,
+  .detail-list-action select,
+  .synopsis-panel p,
+  .profile-copy strong,
+  .profile-signout,
+  .social-community-modal-header p:not(.eyebrow),
+  .community-tabs button,
+  .social-profile-tabs button,
+  .social-search-field input,
+  .social-search-note,
+  .social-user-copy small,
+  .social-user-copy > span,
+  .social-discover-empty p,
+  .social-empty span,
+  .social-private-state p,
+  .social-error,
+  .social-notice,
+  .social-profile-copy > span,
+  .social-profile-copy > p:not(.eyebrow),
+  .social-profile-stats span,
+  .social-list-detail-head p:not(.eyebrow),
+  .episode-unknown-detail p
+) {
+  font-size: max(12px, 1em);
+}
+
+:where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 3px;
+  box-shadow: var(--focus-ring);
+}
+
+:where(.icon-button, .account-button, .search-field > button, .mobile-nav-item) {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+:where(.primary-button, .outline-button, .discover-tab, .status-tab, .view-toggle button) {
+  min-height: 40px;
+}
+
+@media (max-width: 700px) {
+  .main-content {
+    width: min(100% - 32px, 560px);
+    padding-top: 28px;
+    padding-bottom: 104px;
+  }
+
+  .page-intro,
+  .home-welcome {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .home-summary {
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .topbar {
+    gap: 14px;
+    padding-inline: 16px;
+  }
+
+  .footer {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-inline: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

@@ -1370,7 +1370,7 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
 function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd }) {
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featured = watching[featuredIndex] || watching[0] || null;
-  const currentEpisode = Number(featured?.episode_current || 0);
+  const currentEpisode = Math.max(0, Number(featured?.episode_current || 0) || 0);
   const expectedTotal = featured && !isCurrentlyAiring(featured) ? totalEpisodes(featured) : null;
   const available = featured ? episodeProgressLimit(featured) : null;
   const nextEpisode = currentEpisode + 1;
@@ -1479,7 +1479,8 @@ function AnimeShelf({ title, subtitle, items, onViewAll, onOpenAnime }) {
 
 function PosterCard({ anime, onClick, compact = false, showProgress = true }) {
   const total = episodeProgressLimit(anime);
-  const progress = total ? Math.min(100, Math.max(0, (Number(anime.episode_current || 0) / total) * 100)) : 0;
+  const currentEpisode = Math.max(0, Number(anime.episode_current || 0) || 0);
+  const progress = total ? Math.min(100, Math.max(0, (currentEpisode / total) * 100)) : 0;
   return (
     <button className={compact ? 'poster-card compact' : 'poster-card'} onClick={onClick} title={displayTitle(anime)}>
       <div className="poster-art">
@@ -1489,7 +1490,7 @@ function PosterCard({ anime, onClick, compact = false, showProgress = true }) {
         {!['watching', 'paused'].includes(anime.status) && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
         {showProgress && anime.status === 'watching' && <>
           <span className={total ? 'poster-progress' : 'poster-progress is-indeterminate'}><i style={{ width: (total ? progress : 34) + '%' }} /></span>
-          <span className="poster-episode-count">EP. {Number(anime.episode_current || 0)}{total ? ' / ' + total : ''}</span>
+          <span className="poster-episode-count">EP. {currentEpisode}{total ? ' / ' + total : ''}</span>
         </>}
       </div>
       <span className="poster-name">{displayTitle(anime)}</span>
@@ -1576,13 +1577,14 @@ function LibraryPage({
 
 function AnimeRow({ anime, onClick }) {
   const total = episodeProgressLimit(anime);
-  const pct = total ? Math.min(100, Math.max(0, Math.round((Number(anime.episode_current || 0) / total) * 100))) : 0;
+  const currentEpisode = Math.max(0, Number(anime.episode_current || 0) || 0);
+  const pct = total ? Math.min(100, Math.max(0, Math.round((currentEpisode / total) * 100))) : 0;
   return (
     <button className="anime-row" onClick={onClick}>
       {anime.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <div className="row-fallback"><Clapperboard size={20} /></div>}
       <span className="row-title"><strong>{displayTitle(anime)}</strong><small>{formatReleaseLabel(anime)} · {localizedFormat(anime.format)}</small></span>
       <span className={'row-status tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
-      <span className={anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'row-progress is-unknown' : !total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'Episódio não lembrado' : total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}{!(anime.episode_unknown && ['paused', 'dropped'].includes(anime.status)) && <i><b style={{ width: (total ? pct : 34) + '%' }} /></i>}</span>
+      <span className={anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'row-progress is-unknown' : !total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'Episódio não lembrado' : total ? currentEpisode + ' / ' + total + ' eps.' : currentEpisode + ' eps.'}{!(anime.episode_unknown && ['paused', 'dropped'].includes(anime.status)) && <i><b style={{ width: (total ? pct : 34) + '%' }} /></i>}</span>
       <span className="row-rating">{!['watching', 'paused'].includes(anime.status) && anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
       <ChevronRight size={16} className="row-chevron" />
     </button>

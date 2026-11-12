@@ -564,7 +564,7 @@ export default function App() {
     else if (sort === 'progress') data.sort((a, b) => {
       const progressOf = anime => {
         const limit = episodeProgressLimit(anime);
-        return limit ? Math.min(1, Number(anime.episode_current || 0) / limit) : 0;
+        return limit ? Math.min(1, Math.max(0, Number(anime.episode_current || 0) / limit)) : 0;
       };
       return progressOf(b) - progressOf(a);
     });

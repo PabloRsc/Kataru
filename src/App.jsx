@@ -550,9 +550,9 @@ export default function App() {
 
   const visibleItems = useMemo(() => {
     let data = items.filter(anime => {
-      const text = (displayTitle(anime) + ' ' + (anime.title_english || '')).toLowerCase();
+      const normalizedQuery = normalizeAnimeTitle(query);
       const matchesStatus = filter === 'all' || anime.status === filter;
-      const matchesQuery = text.includes(query.trim().toLowerCase());
+      const matchesQuery = !normalizedQuery || getAnimeAliases(anime).some(alias => normalizeAnimeTitle(alias).includes(normalizedQuery));
       const matchesGenre = !genreFilter || (anime.genres || []).includes(genreFilter);
       const matchesYear = !yearFilter || String(anime.year || '') === yearFilter;
       const matchesFormat = !formatFilter || String(anime.format || '').toLowerCase() === formatFilter.toLowerCase();

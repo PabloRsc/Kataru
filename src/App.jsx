@@ -1500,6 +1500,7 @@ function LibraryPage({
 }) {
   const genres = Array.from(new Set(allItems.flatMap(anime => anime.genres || []))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const years = Array.from(new Set(allItems.map(anime => anime.year).filter(Boolean))).sort((a, b) => b - a);
+  const statusScopedItems = filter === 'all' ? allItems : allItems.filter(anime => anime.status === filter);
   const filtersActive = Boolean(query || genreFilter || yearFilter || formatFilter || ratingFilter);
   const orderedItems = groupAnimeByFranchise(items, sort, allItems)
     .flatMap(group => group.items);
@@ -1525,8 +1526,8 @@ function LibraryPage({
       <div className="library-format-tabs" aria-label="Categorias de anime">
         {FORMAT_FILTERS.map(category => {
           const count = category.id
-            ? allItems.filter(anime => String(anime.format || '').toUpperCase() === category.id.toUpperCase()).length
-            : allItems.length;
+            ? statusScopedItems.filter(anime => String(anime.format || '').toUpperCase() === category.id.toUpperCase()).length
+            : statusScopedItems.length;
           return <button key={category.id || 'all'} className={formatFilter === category.id ? 'active' : ''} onClick={() => setFormatFilter(category.id)}>{category.label}<span>{count}</span></button>;
         })}
       </div>

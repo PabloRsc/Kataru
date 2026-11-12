@@ -1559,7 +1559,7 @@ function LibraryPage({
         })}
       </div>
       <div className="library-toolbar">
-        <label className="search-field"><Search size={16} /><input ref={searchInputRef} value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar na biblioteca" aria-label="Buscar na biblioteca" /><kbd>/</kbd>{query && <button onClick={() => setQuery('')} aria-label="Limpar busca"><X size={14} /></button>}</label>
+        <label className="search-field"><Search size={16} /><input ref={searchInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape' && query) { event.preventDefault(); setQuery(''); } }} placeholder="Buscar na biblioteca" aria-label="Buscar na biblioteca" /><kbd>/</kbd>{query && <button onClick={() => setQuery('')} aria-label="Limpar busca"><X size={14} /></button>}</label>
         <div className="filter-controls">
           <label className="select-filter"><SlidersHorizontal size={14} /><select value={sort} onChange={event => setSort(event.target.value)}>{SORT_OPTIONS.map(option => <option key={option.id} value={option.id}>Ordenar: {option.label}</option>)}</select><ChevronDown size={13} /></label>
           <label className="select-filter"><select value={genreFilter} onChange={event => setGenreFilter(event.target.value)}><option value="">Gênero</option>{genres.map(genre => <option key={genre}>{genre}</option>)}</select><ChevronDown size={13} /></label>

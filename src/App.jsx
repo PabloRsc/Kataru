@@ -1570,9 +1570,9 @@ function LibraryPage({
       {filtersActive && <div className="active-filters"><span>Filtros ativos:</span>{query && <button className="filter-chip" onClick={() => setQuery('')}>Busca: {query}<X size={12} /></button>}{genreFilter && <button className="filter-chip" onClick={() => setGenreFilter('')}>{genreFilter}<X size={12} /></button>}{yearFilter && <button className="filter-chip" onClick={() => setYearFilter('')}>{yearFilter}<X size={12} /></button>}{formatFilter && <button className="filter-chip" onClick={() => setFormatFilter('')}>{FORMAT_FILTERS.find(category => category.id === formatFilter)?.label || localizedFormat(formatFilter)}<X size={12} /></button>}{ratingFilter && <button className="filter-chip" onClick={() => setRatingFilter('')}>{ratingFilter === '8' ? 'Nota: 4 estrelas ou mais' : ratingFilter === '6' ? 'Nota: 3 estrelas ou mais' : 'Nota: 2 estrelas ou mais'}<X size={12} /></button>}<button className="clear-filters" onClick={clearFilters}>Limpar tudo</button></div>}
       {syncBusy && syncProgress && <div className="library-sync-status" role="status">
         <span>Consultando catálogo: {syncProgress.current} de {syncProgress.total}{syncProgress.title ? ' · ' + syncProgress.title : ''}</span>
-        <i><b style={{ width: (syncProgress.total ? syncProgress.current / syncProgress.total * 100 : 0) + '%' }} /></i>
+        <i><b style={{ width: (syncProgress.total ? Math.min(100, Math.max(0, syncProgress.current / syncProgress.total * 100)) : 0) + '%' }} /></i>
       </div>}
-      <div className="results-summary"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{filter === 'all' ? 'Todos os status' : statusLabel(filter)}</span></div>
+      <div className="results-summary" role="status" aria-live="polite" aria-atomic="true"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{filter === 'all' ? 'Todos os status' : statusLabel(filter)}</span></div>
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando sua biblioteca...</div> : items.length ? (
         gridMode === 'grid' ? (
           <div className="library-grid">

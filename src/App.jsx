@@ -1553,8 +1553,8 @@ function LibraryPage({
       <div className="library-format-tabs" aria-label="Categorias de anime">
         {FORMAT_FILTERS.map(category => {
           const count = category.id
-            ? statusScopedItems.filter(anime => String(anime.format || '').toUpperCase() === category.id.toUpperCase()).length
-            : statusScopedItems.length;
+            ? formatCountScopeItems.filter(anime => String(anime.format || '').toUpperCase() === category.id.toUpperCase()).length
+            : formatCountScopeItems.length;
           return <button key={category.id || 'all'} className={formatFilter === category.id ? 'active' : ''} onClick={() => setFormatFilter(category.id)}>{category.label}<span>{count}</span></button>;
         })}
       </div>

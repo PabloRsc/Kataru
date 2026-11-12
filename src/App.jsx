@@ -1576,7 +1576,7 @@ function LibraryPage({
 
 function AnimeRow({ anime, onClick }) {
   const total = episodeProgressLimit(anime);
-  const pct = total ? Math.round((Number(anime.episode_current || 0) / total) * 100) : 0;
+  const pct = total ? Math.min(100, Math.max(0, Math.round((Number(anime.episode_current || 0) / total) * 100))) : 0;
   return (
     <button className="anime-row" onClick={onClick}>
       {anime.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <div className="row-fallback"><Clapperboard size={20} /></div>}

@@ -1507,7 +1507,15 @@ function LibraryPage({
 }) {
   const genres = Array.from(new Set(allItems.flatMap(anime => anime.genres || []))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const years = Array.from(new Set(allItems.map(anime => anime.year).filter(Boolean))).sort((a, b) => b - a);
-  const statusScopedItems = filter === 'all' ? allItems : allItems.filter(anime => anime.status === filter);
+  const normalizedQuery = normalizeAnimeTitle(query);
+  const formatCountScopeItems = allItems.filter(anime => {
+    const matchesStatus = filter === 'all' || anime.status === filter;
+    const matchesQuery = !normalizedQuery || getAnimeAliases(anime).some(alias => normalizeAnimeTitle(alias).includes(normalizedQuery));
+    const matchesGenre = !genreFilter || (anime.genres || []).includes(genreFilter);
+    const matchesYear = !yearFilter || String(anime.year || '') === yearFilter;
+    const matchesRating = !ratingFilter || Number(anime.rating_personal || 0) >= Number(ratingFilter);
+    return matchesStatus && matchesQuery && matchesGenre && matchesYear && matchesRating;
+  });
   const filtersActive = Boolean(query || genreFilter || yearFilter || formatFilter || ratingFilter);
   const orderedItems = groupAnimeByFranchise(items, sort, allItems)
     .flatMap(group => group.items);

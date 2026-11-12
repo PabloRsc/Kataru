@@ -1376,7 +1376,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
   const nextEpisode = currentEpisode + 1;
   const progressTotal = expectedTotal || available;
   const canMarkNext = Boolean(featured && (!progressTotal || currentEpisode < progressTotal));
-  const progress = progressTotal ? Math.min(100, Math.round((currentEpisode / progressTotal) * 100)) : 0;
+  const progress = progressTotal ? Math.min(100, Math.max(0, Math.round((currentEpisode / progressTotal) * 100))) : 0;
 
   useEffect(() => {
     if (watching.length < 2) {
@@ -1479,7 +1479,7 @@ function AnimeShelf({ title, subtitle, items, onViewAll, onOpenAnime }) {
 
 function PosterCard({ anime, onClick, compact = false, showProgress = true }) {
   const total = episodeProgressLimit(anime);
-  const progress = total ? Math.min(100, (Number(anime.episode_current || 0) / total) * 100) : 0;
+  const progress = total ? Math.min(100, Math.max(0, (Number(anime.episode_current || 0) / total) * 100)) : 0;
   return (
     <button className={compact ? 'poster-card compact' : 'poster-card'} onClick={onClick} title={displayTitle(anime)}>
       <div className="poster-art">

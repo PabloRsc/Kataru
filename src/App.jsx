@@ -1500,10 +1500,10 @@ function LibraryPage({
 }) {
   const genres = Array.from(new Set(allItems.flatMap(anime => anime.genres || []))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const years = Array.from(new Set(allItems.map(anime => anime.year).filter(Boolean))).sort((a, b) => b - a);
-  const filtersActive = Boolean(genreFilter || yearFilter || formatFilter || ratingFilter);
+  const filtersActive = Boolean(query || genreFilter || yearFilter || formatFilter || ratingFilter);
   const orderedItems = groupAnimeByFranchise(items, sort, allItems)
     .flatMap(group => group.items);
-  function clearFilters() { setGenreFilter(''); setYearFilter(''); setFormatFilter(''); setRatingFilter(''); }
+  function clearFilters() { setQuery(''); setGenreFilter(''); setYearFilter(''); setFormatFilter(''); setRatingFilter(''); }
 
   return (
     <div className="library-page">
@@ -1539,7 +1539,7 @@ function LibraryPage({
           <label className="select-filter"><select value={ratingFilter} onChange={event => setRatingFilter(event.target.value)}><option value="">Nota</option><option value="8">4 estrelas ou mais</option><option value="6">3 estrelas ou mais</option><option value="4">2 estrelas ou mais</option></select><ChevronDown size={13} /></label>
         </div>
       </div>
-      {filtersActive && <div className="active-filters"><span>Filtros ativos:</span>{genreFilter && <button className="filter-chip" onClick={() => setGenreFilter('')}>{genreFilter}<X size={12} /></button>}{yearFilter && <button className="filter-chip" onClick={() => setYearFilter('')}>{yearFilter}<X size={12} /></button>}{formatFilter && <button className="filter-chip" onClick={() => setFormatFilter('')}>{FORMAT_FILTERS.find(category => category.id === formatFilter)?.label || localizedFormat(formatFilter)}<X size={12} /></button>}{ratingFilter && <button className="filter-chip" onClick={() => setRatingFilter('')}>{ratingFilter}+<X size={12} /></button>}<button className="clear-filters" onClick={clearFilters}>Limpar tudo</button></div>}
+      {filtersActive && <div className="active-filters"><span>Filtros ativos:</span>{query && <button className="filter-chip" onClick={() => setQuery('')}>Busca: {query}<X size={12} /></button>}{genreFilter && <button className="filter-chip" onClick={() => setGenreFilter('')}>{genreFilter}<X size={12} /></button>}{yearFilter && <button className="filter-chip" onClick={() => setYearFilter('')}>{yearFilter}<X size={12} /></button>}{formatFilter && <button className="filter-chip" onClick={() => setFormatFilter('')}>{FORMAT_FILTERS.find(category => category.id === formatFilter)?.label || localizedFormat(formatFilter)}<X size={12} /></button>}{ratingFilter && <button className="filter-chip" onClick={() => setRatingFilter('')}>{ratingFilter}+<X size={12} /></button>}<button className="clear-filters" onClick={clearFilters}>Limpar tudo</button></div>}
       {syncBusy && syncProgress && <div className="library-sync-status" role="status">
         <span>Consultando catálogo: {syncProgress.current} de {syncProgress.total}{syncProgress.title ? ' · ' + syncProgress.title : ''}</span>
         <i><b style={{ width: (syncProgress.total ? syncProgress.current / syncProgress.total * 100 : 0) + '%' }} /></i>

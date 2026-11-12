@@ -549,8 +549,8 @@ export default function App() {
   }, [items]);
 
   const visibleItems = useMemo(() => {
+    const normalizedQuery = normalizeAnimeTitle(query);
     let data = items.filter(anime => {
-      const normalizedQuery = normalizeAnimeTitle(query);
       const matchesStatus = filter === 'all' || anime.status === filter;
       const matchesQuery = !normalizedQuery || getAnimeAliases(anime).some(alias => normalizeAnimeTitle(alias).includes(normalizedQuery));
       const matchesGenre = !genreFilter || (anime.genres || []).includes(genreFilter);

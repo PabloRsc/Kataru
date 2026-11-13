@@ -1383,8 +1383,12 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
       setFeaturedIndex(0);
       return undefined;
     }
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) return undefined;
     const timer = window.setInterval(() => {
-      setFeaturedIndex(current => (current + 1) % watching.length);
+      if (document.visibilityState === 'visible') {
+        setFeaturedIndex(current => (current + 1) % watching.length);
+      }
     }, 60000);
     return () => window.clearInterval(timer);
   }, [watching.length]);

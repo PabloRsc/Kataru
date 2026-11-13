@@ -1158,6 +1158,13 @@ export default function App() {
             onAdd={() => setSearchOpen(true)}
             onOpenSharedAnime={startAddFromSharedAnime}
             onOpenCommunityProfile={profile => { setCommunityTargetProfile(profile); navigate('community'); }}
+            onOpenCommunitySearch={() => {
+              setCommunityReturnPage('home');
+              setCommunityReturnProfile(null);
+              setCommunitySearchInitialQuery('');
+              setCommunityOpen(true);
+              setCommunitySearchRequest(value => value + 1);
+            }}
           />
         ) : page === 'library' ? (
           <LibraryPage
@@ -1369,7 +1376,7 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
   );
 }
 
-function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd, onOpenSharedAnime, onOpenCommunityProfile }) {
+function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd, onOpenSharedAnime, onOpenCommunityProfile, onOpenCommunitySearch }) {
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [followingActivity, setFollowingActivity] = useState([]);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -1484,7 +1491,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
             onRetry={loadFollowingActivity}
             onOpenAnime={onOpenSharedAnime}
             onOpenProfile={onOpenCommunityProfile}
-            onDiscover={() => onNavigate('community')}
+            onDiscover={onOpenCommunitySearch}
           />
           <AnimeShelf title="Atualizados recentemente" subtitle="Os animes com atividade mais recente na sua biblioteca" items={recentlyUpdated} onViewAll={() => onOpenLibrary('all')} onOpenAnime={onOpenAnime} />
           <AnimeShelf title="Assistindo" subtitle="Continue acompanhando suas histórias" items={watching.slice(0, 8)} onViewAll={() => onOpenLibrary('watching')} onOpenAnime={onOpenAnime} />

@@ -1546,11 +1546,11 @@ function LibraryPage({
           <div className="view-toggle" role="group" aria-label="Modo de visualização"><button type="button" aria-pressed={gridMode === 'grid'} className={gridMode === 'grid' ? 'selected' : ''} onClick={() => setGridMode('grid')} aria-label="Visualização em grade"><Grid2X2 size={16} />Grade</button><button type="button" aria-pressed={gridMode === 'list'} className={gridMode === 'list' ? 'selected' : ''} onClick={() => setGridMode('list')} aria-label="Visualização em lista"><List size={16} />Lista</button></div>
         </div>}
       />
-      <div className="status-tabs">
+      <div className="status-tabs" role="group" aria-label="Filtrar biblioteca por status">
         <button type="button" aria-pressed={filter === 'all'} className={filter === 'all' ? 'status-tab active' : 'status-tab'} onClick={() => setFilter('all')}>Todos <span>{counts.all}</span></button>
         {STATUSES.map(status => <button type="button" key={status.id} aria-pressed={filter === status.id} className={filter === status.id ? 'status-tab active' : 'status-tab'} onClick={() => setFilter(status.id)}>{status.label} <span>{counts[status.id] || 0}</span></button>)}
       </div>
-      <div className="library-format-tabs" aria-label="Categorias de anime">
+      <div className="library-format-tabs" role="group" aria-label="Filtrar biblioteca por formato">
         {FORMAT_FILTERS.map(category => {
           const count = category.id
             ? formatCountScopeItems.filter(anime => String(anime.format || '').toUpperCase() === category.id.toUpperCase()).length

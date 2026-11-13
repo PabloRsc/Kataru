@@ -1070,14 +1070,14 @@ export default function App() {
           <button className={page === 'lists' ? 'nav-link active' : 'nav-link'} onClick={() => navigate('lists')}>Listas</button>
                   </nav>
         <div className="topbar-actions">
-          <button className="global-search" aria-label="Buscar usuários" onClick={() => {
+          <button type="button" className="global-search" aria-label="Buscar usuários" onClick={() => {
             setCommunityReturnPage(page);
             setCommunityReturnProfile(page === 'community' ? communityTargetProfile : null);
             setCommunitySearchInitialQuery('');
             setCommunityOpen(true);
             setCommunitySearchRequest(value => value + 1);
           }}><Search size={16} /><span>Buscar usuários...</span></button>
-          <button className="primary-button top-add" onClick={() => {
+          <button type="button" className="primary-button top-add" aria-label="Adicionar anime" onClick={() => {
             setSearchMode('add'); setSearchOpen(true); setSearchQuery(''); setResults([]);
           }}><Plus size={16} />Adicionar anime</button>
           <div className="profile-menu" ref={profileRef}>
@@ -1257,11 +1257,11 @@ export default function App() {
       </footer>
 
       <nav className="mobile-nav" aria-label="Navegação mobile">
-        <button className={page === 'home' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('home')}><Home size={19} /><span>Início</span></button>
-        <button className={page === 'library' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('library')}><Library size={19} /><span>Biblioteca</span></button>
-        <button className="mobile-nav-add" onClick={() => setSearchOpen(true)}><Plus size={21} /></button>
-        <button className={page === 'discover' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('discover')}><Compass size={19} /><span>Descobrir</span></button>
-        <button className={page === 'lists' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('lists')}><List size={19} /><span>Listas</span></button>
+        <button type="button" aria-current={page === 'home' ? 'page' : undefined} aria-label="Início" className={page === 'home' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('home')}><Home size={19} /><span>Início</span></button>
+        <button type="button" aria-current={page === 'library' ? 'page' : undefined} aria-label="Biblioteca" className={page === 'library' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('library')}><Library size={19} /><span>Biblioteca</span></button>
+        <button type="button" className="mobile-nav-add" aria-label="Adicionar anime" onClick={() => setSearchOpen(true)}><Plus size={21} /></button>
+        <button type="button" aria-current={page === 'discover' ? 'page' : undefined} aria-label="Descobrir" className={page === 'discover' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('discover')}><Compass size={19} /><span>Descobrir</span></button>
+        <button type="button" aria-current={page === 'lists' ? 'page' : undefined} aria-label="Listas" className={page === 'lists' ? 'mobile-nav-item active' : 'mobile-nav-item'} onClick={() => navigate('lists')}><List size={19} /><span>Listas</span></button>
       </nav>
 
       {communityOpen && (

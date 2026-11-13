@@ -1547,15 +1547,15 @@ function LibraryPage({
         </div>}
       />
       <div className="status-tabs">
-        <button className={filter === 'all' ? 'status-tab active' : 'status-tab'} onClick={() => setFilter('all')}>Todos <span>{counts.all}</span></button>
-        {STATUSES.map(status => <button key={status.id} className={filter === status.id ? 'status-tab active' : 'status-tab'} onClick={() => setFilter(status.id)}>{status.label} <span>{counts[status.id] || 0}</span></button>)}
+        <button type="button" aria-pressed={filter === 'all'} className={filter === 'all' ? 'status-tab active' : 'status-tab'} onClick={() => setFilter('all')}>Todos <span>{counts.all}</span></button>
+        {STATUSES.map(status => <button type="button" key={status.id} aria-pressed={filter === status.id} className={filter === status.id ? 'status-tab active' : 'status-tab'} onClick={() => setFilter(status.id)}>{status.label} <span>{counts[status.id] || 0}</span></button>)}
       </div>
       <div className="library-format-tabs" aria-label="Categorias de anime">
         {FORMAT_FILTERS.map(category => {
           const count = category.id
             ? formatCountScopeItems.filter(anime => String(anime.format || '').toUpperCase() === category.id.toUpperCase()).length
             : formatCountScopeItems.length;
-          return <button key={category.id || 'all'} className={formatFilter === category.id ? 'active' : ''} onClick={() => setFormatFilter(category.id)}>{category.label}<span>{count}</span></button>;
+          return <button type="button" key={category.id || 'all'} aria-pressed={formatFilter === category.id} className={formatFilter === category.id ? 'active' : ''} onClick={() => setFormatFilter(category.id)}>{category.label}<span>{count}</span></button>;
         })}
       </div>
       <div className="library-toolbar">

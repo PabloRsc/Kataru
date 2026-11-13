@@ -1543,7 +1543,7 @@ function LibraryPage({
           <button className="outline-button library-sync-button" onClick={onSyncMetadata} disabled={syncBusy || !allItems.some(anime => !anime.is_manual)}>
             {syncBusy ? `Atualizando ${syncProgress?.current || 0}/${syncProgress?.total || 0}...` : 'Atualizar datas e temporadas'}
           </button>
-          <div className="view-toggle"><button className={gridMode === 'grid' ? 'selected' : ''} onClick={() => setGridMode('grid')} aria-label="Visualização em grade"><Grid2X2 size={16} />Grade</button><button className={gridMode === 'list' ? 'selected' : ''} onClick={() => setGridMode('list')} aria-label="Visualização em lista"><List size={16} />Lista</button></div>
+          <div className="view-toggle" role="group" aria-label="Modo de visualização"><button type="button" aria-pressed={gridMode === 'grid'} className={gridMode === 'grid' ? 'selected' : ''} onClick={() => setGridMode('grid')} aria-label="Visualização em grade"><Grid2X2 size={16} />Grade</button><button type="button" aria-pressed={gridMode === 'list'} className={gridMode === 'list' ? 'selected' : ''} onClick={() => setGridMode('list')} aria-label="Visualização em lista"><List size={16} />Lista</button></div>
         </div>}
       />
       <div className="status-tabs">

@@ -2545,3 +2545,34 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     transition-duration: .01ms !important;
   }
 }
+
+
+/* Biblioteca: filtros mais confortáveis em telas estreitas */
+@media (max-width: 600px) {
+  .library-toolbar .filter-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .library-toolbar .select-filter {
+    min-width: 0;
+    min-height: 40px;
+    width: 100%;
+    padding-inline: 10px;
+  }
+
+  .library-toolbar .select-filter select {
+    min-width: 0;
+    font-size: 11px;
+  }
+
+  .library-format-tabs {
+    padding-bottom: 7px;
+    scroll-snap-type: x proximity;
+  }
+
+  .library-format-tabs button {
+    min-height: 40px;
+    scroll-snap-align: start;
+  }
+}

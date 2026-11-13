@@ -549,10 +549,10 @@ export default function App() {
   }, [items]);
 
   const visibleItems = useMemo(() => {
+    const normalizedQuery = normalizeAnimeTitle(query);
     let data = items.filter(anime => {
-      const text = (displayTitle(anime) + ' ' + (anime.title_english || '')).toLowerCase();
       const matchesStatus = filter === 'all' || anime.status === filter;
-      const matchesQuery = text.includes(query.trim().toLowerCase());
+      const matchesQuery = !normalizedQuery || getAnimeAliases(anime).some(alias => normalizeAnimeTitle(alias).includes(normalizedQuery));
       const matchesGenre = !genreFilter || (anime.genres || []).includes(genreFilter);
       const matchesYear = !yearFilter || String(anime.year || '') === yearFilter;
       const matchesFormat = !formatFilter || String(anime.format || '').toLowerCase() === formatFilter.toLowerCase();
@@ -561,7 +561,13 @@ export default function App() {
     });
     if (sort === 'title') data.sort((a, b) => displayTitle(a).localeCompare(displayTitle(b), 'pt-BR'));
     else if (sort === 'rating') data.sort((a, b) => Number(b.rating_personal || 0) - Number(a.rating_personal || 0));
-    else if (sort === 'progress') data.sort((a, b) => (Number(b.episode_current || 0) / (totalEpisodes(b) || 999999)) - (Number(a.episode_current || 0) / (totalEpisodes(a) || 999999)));
+    else if (sort === 'progress') data.sort((a, b) => {
+      const progressOf = anime => {
+        const limit = episodeProgressLimit(anime);
+        return limit ? Math.min(1, Math.max(0, Number(anime.episode_current || 0) / limit)) : 0;
+      };
+      return progressOf(b) - progressOf(a);
+    });
     else if (sort === 'added') data.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     else if (sort === 'updated') data.sort(sortByRecent);
     else if (sort === 'release-desc') data.sort((a, b) => compareReleaseDate(b, a));
@@ -1364,21 +1370,25 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
 function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd }) {
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featured = watching[featuredIndex] || watching[0] || null;
-  const currentEpisode = Number(featured?.episode_current || 0);
+  const currentEpisode = Math.max(0, Number(featured?.episode_current || 0) || 0);
   const expectedTotal = featured && !isCurrentlyAiring(featured) ? totalEpisodes(featured) : null;
   const available = featured ? episodeProgressLimit(featured) : null;
   const nextEpisode = currentEpisode + 1;
   const progressTotal = expectedTotal || available;
   const canMarkNext = Boolean(featured && (!progressTotal || currentEpisode < progressTotal));
-  const progress = progressTotal ? Math.min(100, Math.round((currentEpisode / progressTotal) * 100)) : 0;
+  const progress = progressTotal ? Math.min(100, Math.max(0, Math.round((currentEpisode / progressTotal) * 100))) : 0;
 
   useEffect(() => {
     if (watching.length < 2) {
       setFeaturedIndex(0);
       return undefined;
     }
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) return undefined;
     const timer = window.setInterval(() => {
-      setFeaturedIndex(current => (current + 1) % watching.length);
+      if (document.visibilityState === 'visible') {
+        setFeaturedIndex(current => (current + 1) % watching.length);
+      }
     }, 60000);
     return () => window.clearInterval(timer);
   }, [watching.length]);
@@ -1390,7 +1400,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
   return (
     <div className="home-page">
       {featured ? (
-        <section className="continue-hero">
+        <section className="continue-hero" aria-label="Continue de onde parou">
           <div
             className="continue-backdrop"
             aria-hidden="true"
@@ -1420,8 +1430,8 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
           </button>
           {watching.length > 1 && (
             <>
-              <button className="continue-side-control continue-side-prev" onClick={() => setFeaturedIndex(current => (current - 1 + watching.length) % watching.length)} aria-label="Anime anterior"><ChevronLeft size={21} /></button>
-              <button className="continue-side-control continue-side-next" onClick={() => setFeaturedIndex(current => (current + 1) % watching.length)} aria-label="Próximo anime"><ChevronRight size={21} /></button>
+              <button type="button" className="continue-side-control continue-side-prev" onClick={() => setFeaturedIndex(current => (current - 1 + watching.length) % watching.length)} aria-label="Anime anterior"><ChevronLeft size={21} /></button>
+              <button type="button" className="continue-side-control continue-side-next" onClick={() => setFeaturedIndex(current => (current + 1) % watching.length)} aria-label="Próximo anime"><ChevronRight size={21} /></button>
             </>
           )}
         </section>
@@ -1438,7 +1448,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
         </section>
       )}
 
-      <div className="home-summary" aria-label="Resumo da biblioteca">
+      <div className="home-summary" role="group" aria-label="Resumo da biblioteca por status">
         <div><strong>{counts.completed || 0}</strong><span>assistidos</span></div>
         <div><strong>{counts.watching || 0}</strong><span>assistindo</span></div>
         <div><strong>{counts.planned || 0}</strong><span>quero assistir</span></div>
@@ -1447,6 +1457,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
 
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Preparando sua biblioteca...</div> : (
         <>
+          <AnimeShelf title="Atualizados recentemente" subtitle="Os animes com atividade mais recente na sua biblioteca" items={recentlyUpdated} onViewAll={() => onOpenLibrary('all')} onOpenAnime={onOpenAnime} />
           <AnimeShelf title="Assistindo" subtitle="Continue acompanhando suas histórias" items={watching.slice(0, 8)} onViewAll={() => onOpenLibrary('watching')} onOpenAnime={onOpenAnime} />
           <AnimeShelf title="Assistidos recentemente" subtitle="Histórias que já chegaram ao fim" items={completed.slice(0, 8)} onViewAll={() => onOpenLibrary('completed')} onOpenAnime={onOpenAnime} />
           <AnimeShelf title="Quero assistir" subtitle="Sua próxima maratona pode estar aqui" items={planned.slice(0, 8)} onViewAll={() => onOpenLibrary('planned')} onOpenAnime={onOpenAnime} />
@@ -1472,7 +1483,8 @@ function AnimeShelf({ title, subtitle, items, onViewAll, onOpenAnime }) {
 
 function PosterCard({ anime, onClick, compact = false, showProgress = true }) {
   const total = episodeProgressLimit(anime);
-  const progress = total ? Math.min(100, (Number(anime.episode_current || 0) / total) * 100) : 0;
+  const currentEpisode = Math.max(0, Number(anime.episode_current || 0) || 0);
+  const progress = total ? Math.min(100, Math.max(0, (currentEpisode / total) * 100)) : 0;
   return (
     <button className={compact ? 'poster-card compact' : 'poster-card'} onClick={onClick} title={displayTitle(anime)}>
       <div className="poster-art">
@@ -1482,7 +1494,7 @@ function PosterCard({ anime, onClick, compact = false, showProgress = true }) {
         {!['watching', 'paused'].includes(anime.status) && anime.rating_personal !== null && anime.rating_personal !== '' && <span className="poster-rating"><Star size={10} fill="currentColor" />{(Number(anime.rating_personal) / 2).toFixed(1)}</span>}
         {showProgress && anime.status === 'watching' && <>
           <span className={total ? 'poster-progress' : 'poster-progress is-indeterminate'}><i style={{ width: (total ? progress : 34) + '%' }} /></span>
-          <span className="poster-episode-count">EP. {Number(anime.episode_current || 0)}{total ? ' / ' + total : ''}</span>
+          <span className="poster-episode-count">EP. {currentEpisode}{total ? ' / ' + total : ''}</span>
         </>}
       </div>
       <span className="poster-name">{displayTitle(anime)}</span>
@@ -1499,10 +1511,39 @@ function LibraryPage({
 }) {
   const genres = Array.from(new Set(allItems.flatMap(anime => anime.genres || []))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const years = Array.from(new Set(allItems.map(anime => anime.year).filter(Boolean))).sort((a, b) => b - a);
-  const filtersActive = Boolean(genreFilter || yearFilter || formatFilter || ratingFilter);
+  const normalizedQuery = normalizeAnimeTitle(query);
+  const formatCountScopeItems = allItems.filter(anime => {
+    const matchesStatus = filter === 'all' || anime.status === filter;
+    const matchesQuery = !normalizedQuery || getAnimeAliases(anime).some(alias => normalizeAnimeTitle(alias).includes(normalizedQuery));
+    const matchesGenre = !genreFilter || (anime.genres || []).includes(genreFilter);
+    const matchesYear = !yearFilter || String(anime.year || '') === yearFilter;
+    const matchesRating = !ratingFilter || Number(anime.rating_personal || 0) >= Number(ratingFilter);
+    return matchesStatus && matchesQuery && matchesGenre && matchesYear && matchesRating;
+  });
+  const filtersActive = Boolean(filter !== 'all' || query || genreFilter || yearFilter || formatFilter || ratingFilter);
+  const resultContext = [
+    filter !== 'all' ? statusLabel(filter) : 'Todos os status',
+    formatFilter ? localizedFormat(formatFilter) : '',
+    genreFilter,
+    yearFilter,
+    ratingFilter ? (ratingFilter === '8' ? 'Nota: 4 estrelas ou mais' : ratingFilter === '6' ? 'Nota: 3 estrelas ou mais' : 'Nota: 2 estrelas ou mais') : '',
+    query ? `Busca: “${query}”` : ''
+  ].filter(Boolean);
   const orderedItems = groupAnimeByFranchise(items, sort, allItems)
     .flatMap(group => group.items);
-  function clearFilters() { setGenreFilter(''); setYearFilter(''); setFormatFilter(''); setRatingFilter(''); }
+  const searchInputRef = useRef(null);
+  useEffect(() => {
+    const focusLibrarySearch = event => {
+      const target = event.target;
+      const isTyping = target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey || isTyping) return;
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener('keydown', focusLibrarySearch);
+    return () => window.removeEventListener('keydown', focusLibrarySearch);
+  }, []);
+  function clearFilters() { setFilter('all'); setQuery(''); setGenreFilter(''); setYearFilter(''); setFormatFilter(''); setRatingFilter(''); }
 
   return (
     <div className="library-page">
@@ -1514,36 +1555,36 @@ function LibraryPage({
           <button className="outline-button library-sync-button" onClick={onSyncMetadata} disabled={syncBusy || !allItems.some(anime => !anime.is_manual)}>
             {syncBusy ? `Atualizando ${syncProgress?.current || 0}/${syncProgress?.total || 0}...` : 'Atualizar datas e temporadas'}
           </button>
-          <div className="view-toggle"><button className={gridMode === 'grid' ? 'selected' : ''} onClick={() => setGridMode('grid')} aria-label="Visualização em grade"><Grid2X2 size={16} />Grade</button><button className={gridMode === 'list' ? 'selected' : ''} onClick={() => setGridMode('list')} aria-label="Visualização em lista"><List size={16} />Lista</button></div>
+          <div className="view-toggle" role="group" aria-label="Modo de visualização"><button type="button" aria-pressed={gridMode === 'grid'} className={gridMode === 'grid' ? 'selected' : ''} onClick={() => setGridMode('grid')} aria-label="Visualização em grade"><Grid2X2 size={16} />Grade</button><button type="button" aria-pressed={gridMode === 'list'} className={gridMode === 'list' ? 'selected' : ''} onClick={() => setGridMode('list')} aria-label="Visualização em lista"><List size={16} />Lista</button></div>
         </div>}
       />
-      <div className="status-tabs">
-        <button className={filter === 'all' ? 'status-tab active' : 'status-tab'} onClick={() => setFilter('all')}>Todos <span>{counts.all}</span></button>
-        {STATUSES.map(status => <button key={status.id} className={filter === status.id ? 'status-tab active' : 'status-tab'} onClick={() => setFilter(status.id)}>{status.label} <span>{counts[status.id] || 0}</span></button>)}
+      <div className="status-tabs" role="group" aria-label="Filtrar biblioteca por status">
+        <button type="button" aria-pressed={filter === 'all'} className={filter === 'all' ? 'status-tab active' : 'status-tab'} onClick={() => setFilter('all')}>Todos <span>{counts.all}</span></button>
+        {STATUSES.map(status => <button type="button" key={status.id} aria-pressed={filter === status.id} className={filter === status.id ? 'status-tab active' : 'status-tab'} onClick={() => setFilter(status.id)}>{status.label} <span>{counts[status.id] || 0}</span></button>)}
       </div>
-      <div className="library-format-tabs" aria-label="Categorias de anime">
+      <div className="library-format-tabs" role="group" aria-label="Filtrar biblioteca por formato">
         {FORMAT_FILTERS.map(category => {
           const count = category.id
-            ? allItems.filter(anime => String(anime.format || '').toUpperCase() === category.id.toUpperCase()).length
-            : allItems.length;
-          return <button key={category.id || 'all'} className={formatFilter === category.id ? 'active' : ''} onClick={() => setFormatFilter(category.id)}>{category.label}<span>{count}</span></button>;
+            ? formatCountScopeItems.filter(anime => String(anime.format || '').toUpperCase() === category.id.toUpperCase()).length
+            : formatCountScopeItems.length;
+          return <button type="button" key={category.id || 'all'} aria-pressed={formatFilter === category.id} className={formatFilter === category.id ? 'active' : ''} onClick={() => setFormatFilter(category.id)}>{category.label}<span>{count}</span></button>;
         })}
       </div>
       <div className="library-toolbar">
-        <label className="search-field"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar na biblioteca" /><kbd>/</kbd>{query && <button onClick={() => setQuery('')} aria-label="Limpar busca"><X size={14} /></button>}</label>
+        <label className="search-field"><Search size={16} /><input ref={searchInputRef} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape' && query) { event.preventDefault(); setQuery(''); } }} placeholder="Buscar na biblioteca" aria-label="Buscar na biblioteca" /><kbd>/</kbd>{query && <button onClick={() => setQuery('')} aria-label="Limpar busca"><X size={14} /></button>}</label>
         <div className="filter-controls">
-          <label className="select-filter"><SlidersHorizontal size={14} /><select value={sort} onChange={event => setSort(event.target.value)}>{SORT_OPTIONS.map(option => <option key={option.id} value={option.id}>Ordenar: {option.label}</option>)}</select><ChevronDown size={13} /></label>
-          <label className="select-filter"><select value={genreFilter} onChange={event => setGenreFilter(event.target.value)}><option value="">Gênero</option>{genres.map(genre => <option key={genre}>{genre}</option>)}</select><ChevronDown size={13} /></label>
-          <label className="select-filter"><select value={yearFilter} onChange={event => setYearFilter(event.target.value)}><option value="">Ano</option>{years.map(year => <option key={year} value={year}>{year}</option>)}</select><ChevronDown size={13} /></label>
-          <label className="select-filter"><select value={ratingFilter} onChange={event => setRatingFilter(event.target.value)}><option value="">Nota</option><option value="8">4 estrelas ou mais</option><option value="6">3 estrelas ou mais</option><option value="4">2 estrelas ou mais</option></select><ChevronDown size={13} /></label>
+          <label className="select-filter"><SlidersHorizontal size={14} /><select aria-label="Ordenar biblioteca" value={sort} onChange={event => setSort(event.target.value)}>{SORT_OPTIONS.map(option => <option key={option.id} value={option.id}>Ordenar: {option.label}</option>)}</select><ChevronDown size={13} /></label>
+          <label className="select-filter"><select aria-label="Filtrar por gênero" value={genreFilter} onChange={event => setGenreFilter(event.target.value)}><option value="">Gênero</option>{genres.map(genre => <option key={genre}>{genre}</option>)}</select><ChevronDown size={13} /></label>
+          <label className="select-filter"><select aria-label="Filtrar por ano" value={yearFilter} onChange={event => setYearFilter(event.target.value)}><option value="">Ano</option>{years.map(year => <option key={year} value={year}>{year}</option>)}</select><ChevronDown size={13} /></label>
+          <label className="select-filter"><select aria-label="Filtrar por nota mínima" value={ratingFilter} onChange={event => setRatingFilter(event.target.value)}><option value="">Nota</option><option value="8">4 estrelas ou mais</option><option value="6">3 estrelas ou mais</option><option value="4">2 estrelas ou mais</option></select><ChevronDown size={13} /></label>
         </div>
       </div>
-      {filtersActive && <div className="active-filters"><span>Filtros ativos:</span>{genreFilter && <button className="filter-chip" onClick={() => setGenreFilter('')}>{genreFilter}<X size={12} /></button>}{yearFilter && <button className="filter-chip" onClick={() => setYearFilter('')}>{yearFilter}<X size={12} /></button>}{formatFilter && <button className="filter-chip" onClick={() => setFormatFilter('')}>{FORMAT_FILTERS.find(category => category.id === formatFilter)?.label || localizedFormat(formatFilter)}<X size={12} /></button>}{ratingFilter && <button className="filter-chip" onClick={() => setRatingFilter('')}>{ratingFilter}+<X size={12} /></button>}<button className="clear-filters" onClick={clearFilters}>Limpar tudo</button></div>}
+      {filtersActive && <div className="active-filters"><span>Filtros ativos:</span>{filter !== 'all' && <button className="filter-chip" onClick={() => setFilter('all')}>Status: {statusLabel(filter)}<X size={12} /></button>}{query && <button className="filter-chip" onClick={() => setQuery('')}>Busca: {query}<X size={12} /></button>}{genreFilter && <button className="filter-chip" onClick={() => setGenreFilter('')}>{genreFilter}<X size={12} /></button>}{yearFilter && <button className="filter-chip" onClick={() => setYearFilter('')}>{yearFilter}<X size={12} /></button>}{formatFilter && <button className="filter-chip" onClick={() => setFormatFilter('')}>{FORMAT_FILTERS.find(category => category.id === formatFilter)?.label || localizedFormat(formatFilter)}<X size={12} /></button>}{ratingFilter && <button className="filter-chip" onClick={() => setRatingFilter('')}>{ratingFilter === '8' ? 'Nota: 4 estrelas ou mais' : ratingFilter === '6' ? 'Nota: 3 estrelas ou mais' : 'Nota: 2 estrelas ou mais'}<X size={12} /></button>}<button className="clear-filters" onClick={clearFilters}>Limpar tudo</button></div>}
       {syncBusy && syncProgress && <div className="library-sync-status" role="status">
         <span>Consultando catálogo: {syncProgress.current} de {syncProgress.total}{syncProgress.title ? ' · ' + syncProgress.title : ''}</span>
-        <i><b style={{ width: (syncProgress.total ? syncProgress.current / syncProgress.total * 100 : 0) + '%' }} /></i>
+        <i><b style={{ width: (syncProgress.total ? Math.min(100, Math.max(0, syncProgress.current / syncProgress.total * 100)) : 0) + '%' }} /></i>
       </div>}
-      <div className="results-summary"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{filter === 'all' ? 'Todos os status' : statusLabel(filter)}</span></div>
+      <div className="results-summary" role="status" aria-live="polite" aria-atomic="true"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{resultContext.join(' · ')}</span></div>
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando sua biblioteca...</div> : items.length ? (
         gridMode === 'grid' ? (
           <div className="library-grid">
@@ -1568,13 +1609,14 @@ function LibraryPage({
 
 function AnimeRow({ anime, onClick }) {
   const total = episodeProgressLimit(anime);
-  const pct = total ? Math.round((Number(anime.episode_current || 0) / total) * 100) : 0;
+  const currentEpisode = Math.max(0, Number(anime.episode_current || 0) || 0);
+  const pct = total ? Math.min(100, Math.max(0, Math.round((currentEpisode / total) * 100))) : 0;
   return (
     <button className="anime-row" onClick={onClick}>
       {anime.image_url ? <img src={anime.image_url} alt="" loading="lazy" /> : <div className="row-fallback"><Clapperboard size={20} /></div>}
       <span className="row-title"><strong>{displayTitle(anime)}</strong><small>{formatReleaseLabel(anime)} · {localizedFormat(anime.format)}</small></span>
       <span className={'row-status tone-' + statusTone(anime.status)}>{statusLabel(anime.status)}</span>
-      <span className={anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'row-progress is-unknown' : !total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'Episódio não lembrado' : total ? (anime.episode_current || 0) + ' / ' + total + ' eps.' : (anime.episode_current || 0) + ' eps.'}{!(anime.episode_unknown && ['paused', 'dropped'].includes(anime.status)) && <i><b style={{ width: (total ? pct : 34) + '%' }} /></i>}</span>
+      <span className={anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'row-progress is-unknown' : !total && anime.status === 'watching' ? 'row-progress is-indeterminate' : 'row-progress'}>{anime.episode_unknown && ['paused', 'dropped'].includes(anime.status) ? 'Episódio não lembrado' : total ? currentEpisode + ' / ' + total + ' eps.' : currentEpisode + ' eps.'}{!(anime.episode_unknown && ['paused', 'dropped'].includes(anime.status)) && <i><b style={{ width: (total ? pct : 34) + '%' }} /></i>}</span>
       <span className="row-rating">{!['watching', 'paused'].includes(anime.status) && anime.rating_personal ? <><Star size={12} fill="currentColor" />{(anime.rating_personal / 2).toFixed(1)}</> : '—'}</span>
       <ChevronRight size={16} className="row-chevron" />
     </button>

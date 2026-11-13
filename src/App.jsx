@@ -1517,6 +1517,14 @@ function LibraryPage({
     return matchesStatus && matchesQuery && matchesGenre && matchesYear && matchesRating;
   });
   const filtersActive = Boolean(filter !== 'all' || query || genreFilter || yearFilter || formatFilter || ratingFilter);
+  const resultContext = [
+    filter !== 'all' ? statusLabel(filter) : 'Todos os status',
+    formatFilter ? localizedFormat(formatFilter) : '',
+    genreFilter,
+    yearFilter,
+    ratingFilter ? (ratingFilter === '8' ? 'Nota: 4 estrelas ou mais' : ratingFilter === '6' ? 'Nota: 3 estrelas ou mais' : 'Nota: 2 estrelas ou mais') : '',
+    query ? `Busca: “${query}”` : ''
+  ].filter(Boolean);
   const orderedItems = groupAnimeByFranchise(items, sort, allItems)
     .flatMap(group => group.items);
   const searchInputRef = useRef(null);
@@ -1572,7 +1580,7 @@ function LibraryPage({
         <span>Consultando catálogo: {syncProgress.current} de {syncProgress.total}{syncProgress.title ? ' · ' + syncProgress.title : ''}</span>
         <i><b style={{ width: (syncProgress.total ? Math.min(100, Math.max(0, syncProgress.current / syncProgress.total * 100)) : 0) + '%' }} /></i>
       </div>}
-      <div className="results-summary" role="status" aria-live="polite" aria-atomic="true"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{filter === 'all' ? 'Todos os status' : statusLabel(filter)}</span></div>
+      <div className="results-summary" role="status" aria-live="polite" aria-atomic="true"><span>{items.length} {items.length === 1 ? 'resultado' : 'resultados'}</span><span>{resultContext.join(' · ')}</span></div>
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Carregando sua biblioteca...</div> : items.length ? (
         gridMode === 'grid' ? (
           <div className="library-grid">

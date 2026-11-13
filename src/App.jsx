@@ -1396,7 +1396,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
   return (
     <div className="home-page">
       {featured ? (
-        <section className="continue-hero">
+        <section className="continue-hero" aria-label="Continue de onde parou">
           <div
             className="continue-backdrop"
             aria-hidden="true"
@@ -1426,8 +1426,8 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
           </button>
           {watching.length > 1 && (
             <>
-              <button className="continue-side-control continue-side-prev" onClick={() => setFeaturedIndex(current => (current - 1 + watching.length) % watching.length)} aria-label="Anime anterior"><ChevronLeft size={21} /></button>
-              <button className="continue-side-control continue-side-next" onClick={() => setFeaturedIndex(current => (current + 1) % watching.length)} aria-label="Próximo anime"><ChevronRight size={21} /></button>
+              <button type="button" className="continue-side-control continue-side-prev" onClick={() => setFeaturedIndex(current => (current - 1 + watching.length) % watching.length)} aria-label="Anime anterior"><ChevronLeft size={21} /></button>
+              <button type="button" className="continue-side-control continue-side-next" onClick={() => setFeaturedIndex(current => (current + 1) % watching.length)} aria-label="Próximo anime"><ChevronRight size={21} /></button>
             </>
           )}
         </section>
@@ -1444,7 +1444,7 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
         </section>
       )}
 
-      <div className="home-summary" aria-label="Resumo da biblioteca">
+      <div className="home-summary" role="group" aria-label="Resumo da biblioteca por status">
         <div><strong>{counts.completed || 0}</strong><span>assistidos</span></div>
         <div><strong>{counts.watching || 0}</strong><span>assistindo</span></div>
         <div><strong>{counts.planned || 0}</strong><span>quero assistir</span></div>

@@ -10,7 +10,7 @@ import {
 import { discoverAnime, fetchAnime, fetchAnimeGenres, searchAnime } from './api';
 import {
   createAnimeList, deleteAnime, deleteAnimeList, getAnimeList, getAnimeLists,
-  getCurrentKataruProfile, getFollowedKataruAnime, getFollowedKataruLists,
+  getCurrentKataruProfile, getFollowedKataruAnime, getFollowedKataruLists, getFollowingKataruActivity,
   getKataruProfile, getKataruRelationProfiles,
   getKataruSocialStats, isFollowingKataruUser, isKataruUsernameAvailable, searchKataruProfiles,
   followKataruUser, unfollowKataruUser, updateKataruProfile, uploadKataruAvatar, removeKataruAvatar,
@@ -1156,6 +1156,8 @@ export default function App() {
             onOpenAnime={setSelected}
             onQuickEpisode={anime => changeEpisode(anime, 1)}
             onAdd={() => setSearchOpen(true)}
+            onOpenSharedAnime={startAddFromSharedAnime}
+            onOpenCommunityProfile={profile => { setCommunityTargetProfile(profile); navigate('community'); }}
           />
         ) : page === 'library' ? (
           <LibraryPage
@@ -1367,8 +1369,26 @@ function PageIntro({ eyebrow, title, subtitle, action }) {
   );
 }
 
-function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd }) {
+function HomePage({ items, watching, completed, planned, recentlyUpdated, loading, counts, onNavigate, onOpenLibrary, onOpenAnime, onQuickEpisode, onAdd, onOpenSharedAnime, onOpenCommunityProfile }) {
   const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [followingActivity, setFollowingActivity] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
+
+  const loadFollowingActivity = async () => {
+    if (storageMode !== 'supabase') return;
+    setActivityLoading(true);
+    setActivityError('');
+    try {
+      setFollowingActivity(await getFollowingKataruActivity(24));
+    } catch (error) {
+      setActivityError(error.message || 'Não foi possível carregar as atualizações.');
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
+  useEffect(() => { loadFollowingActivity(); }, []);
   const featured = watching[featuredIndex] || watching[0] || null;
   const currentEpisode = Math.max(0, Number(featured?.episode_current || 0) || 0);
   const expectedTotal = featured && !isCurrentlyAiring(featured) ? totalEpisodes(featured) : null;
@@ -1457,6 +1477,15 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
 
       {loading ? <div className="loading-block"><LoaderCircle className="spin" />Preparando sua biblioteca...</div> : (
         <>
+          <FollowingActivity
+            items={followingActivity}
+            loading={activityLoading}
+            error={activityError}
+            onRetry={loadFollowingActivity}
+            onOpenAnime={onOpenSharedAnime}
+            onOpenProfile={onOpenCommunityProfile}
+            onDiscover={() => onNavigate('community')}
+          />
           <AnimeShelf title="Atualizados recentemente" subtitle="Os animes com atividade mais recente na sua biblioteca" items={recentlyUpdated} onViewAll={() => onOpenLibrary('all')} onOpenAnime={onOpenAnime} />
           <AnimeShelf title="Assistindo" subtitle="Continue acompanhando suas histórias" items={watching.slice(0, 8)} onViewAll={() => onOpenLibrary('watching')} onOpenAnime={onOpenAnime} />
           <AnimeShelf title="Assistidos recentemente" subtitle="Histórias que já chegaram ao fim" items={completed.slice(0, 8)} onViewAll={() => onOpenLibrary('completed')} onOpenAnime={onOpenAnime} />
@@ -1465,6 +1494,46 @@ function HomePage({ items, watching, completed, planned, recentlyUpdated, loadin
         </>
       )}
     </div>
+  );
+}
+
+function FollowingActivity({ items, loading, error, onRetry, onOpenAnime, onOpenProfile, onDiscover }) {
+  if (!loading && !error && !items.length) {
+    return (
+      <section className="following-activity-section">
+        <div className="section-heading"><div><h2>Da comunidade</h2><p>Acompanhe as novidades de quem você segue</p></div></div>
+        <div className="following-activity-empty">
+          <Users size={21} />
+          <div><strong>Seu feed começa aqui</strong><span>Encontre pessoas, siga outros fãs e veja as atualizações das bibliotecas delas.</span></div>
+          <button className="outline-button" onClick={onDiscover}><Search size={14} />Buscar pessoas</button>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section className="following-activity-section">
+      <div className="section-heading">
+        <div><h2>Da comunidade</h2><p>Atualizações recentes de quem você segue</p></div>
+        <button className="text-link" onClick={onRetry} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar'} <ArrowRight size={14} /></button>
+      </div>
+      {loading && !items.length ? <div className="loading-block"><LoaderCircle className="spin" />Carregando atividade...</div>
+        : error && !items.length ? <div className="following-activity-empty"><span>{error}</span><button className="outline-button" onClick={onRetry}>Tentar novamente</button></div>
+        : <div className="following-activity-grid">
+          {items.slice(0, 8).map(activity => (
+            <article className="following-activity-card" key={activity.profile.user_id + ':' + activity.mal_id}>
+              <button type="button" className="following-activity-user" onClick={() => onOpenProfile(activity.profile)}>
+                <SocialAvatar profile={activity.profile} />
+                <span><strong>{activity.profile.display_name || activity.profile.username}</strong><small>@{activity.profile.username} · {formatDate(activity.activity_at)}</small></span>
+              </button>
+              <button type="button" className="following-activity-anime" onClick={() => onOpenAnime(activity)}>
+                {activity.image_url ? <img src={activity.image_url} alt="" loading="lazy" /> : <span className="following-activity-cover-fallback"><Clapperboard size={20} /></span>}
+                <span><strong>{displayTitle(activity)}</strong><small>{statusLabel(activity.status)}{activity.rating_personal !== null && activity.rating_personal !== '' ? ' · Nota ' + (Number(activity.rating_personal) / 2).toFixed(1) + '/5' : ''}</small></span>
+                <ChevronRight size={16} />
+              </button>
+            </article>
+          ))}
+        </div>}
+    </section>
   );
 }
 

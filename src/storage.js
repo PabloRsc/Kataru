@@ -288,38 +288,6 @@ export async function getFollowingKataruProfiles() {
   return ids.map(id => byId.get(id)).filter(Boolean);
 }
 
-export async function getFollowingKataruActivity(limit = 24) {
-  const user = await requireUser();
-  const { data: follows, error: followError } = await supabase.from('kataru_follows')
-    .select('followed_id, created_at')
-    .eq('follower_id', user.id)
-    .order('created_at', { ascending: false });
-  if (followError) throw followError;
-  const followedIds = (follows || []).map(row => row.followed_id).filter(Boolean);
-  if (!followedIds.length) return [];
-
-  const [animeResult, profileResult] = await Promise.all([
-    supabase.from('kataru_shared_anime')
-      .select('*')
-      .in('owner_id', followedIds)
-      .order('updated_at', { ascending: false })
-      .limit(Math.min(60, Math.max(1, Number(limit) || 24))),
-    supabase.from('kataru_profiles')
-      .select('user_id, username, display_name, avatar_url')
-      .in('user_id', followedIds)
-  ]);
-  if (animeResult.error) throw animeResult.error;
-  if (profileResult.error) throw profileResult.error;
-
-  const profiles = new Map((profileResult.data || []).map(profile => [profile.user_id, profile]));
-  return (animeResult.data || [])
-    .map(row => {
-      const profile = profiles.get(row.owner_id);
-      return profile ? { ...fromRow(row), profile, activity_at: row.updated_at || row.created_at } : null;
-    })
-    .filter(Boolean);
-}
-
 export async function getFollowedKataruAnime(userId) {
   await requireUser();
   const { data, error } = await supabase.from('kataru_shared_anime')
